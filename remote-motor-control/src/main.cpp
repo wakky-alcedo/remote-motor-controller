@@ -15,7 +15,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <SPI.h>
-#include <AutoDriver.h>
+#include <L6470.h>
 #include <WiFiUdp.h>
 
 // ============================================================================
@@ -44,18 +44,19 @@ WiFiUDP udp;
 // ============================================================================
 // L6470ドライバ設定
 // ============================================================================
-AutoDriver motor(PIN_CS, PIN_RESET);
+L6470 motor(PIN_CS);
 
 // 電気的パラメータ（仕様書準拠）
 #define KVAL_PARAM 0x29    // KVAL_HOLD/RUN/ACC/DEC
-#define OCD_THRESHOLD 0x0F // 過電流検出 (3.375A)
+#define OCD_THRESHOLD 6000 // 過電流検出 (mA)
+#define STALL_CURRENT 3000 // ストール電流 (mA)
 
 // マイクロステップ設定
 enum StepMode {
-  STEP_128 = 0,  // 低速・静音
-  STEP_32  = 3,  // 中速
-  STEP_8   = 5,  // 高速・高トルク
-  STEP_FULL = 7  // フルステップ
+  STEP_128 = 128,  // 低速・静音
+  STEP_32  = 32,   // 中速
+  STEP_8   = 8,    // 高速・高トルク
+  STEP_FULL = 1    // フルステップ
 };
 
 // 速度閾値（step/s）
@@ -101,36 +102,21 @@ struct SystemState {
 void initMotor() {
   Serial.println("[Motor] Initializing L6470...");
   
-  // SPIバス初期化
-  SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_CS);
+  // ピン設定（L6470ライブラリのソフトウェアSPI使用）
+  motor.set_pins(PIN_SPI_SCK, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_RESET, PIN_BUSY);
   
-  // BUSY/RESETピン設定
-  pinMode(PIN_BUSY, INPUT);
-  pinMode(PIN_RESET, OUTPUT);
-  
-  // リセット
-  digitalWrite(PIN_RESET, LOW);
-  delay(10);
-  digitalWrite(PIN_RESET, HIGH);
+  // 初期化
+  motor.init();
   delay(100);
   
   // L6470パラメータ設定（仕様書準拠）
-  motor.configSyncPin(BUSY_PIN, 0);  // BUSYピンを同期ピンとして設定
-  motor.configStepMode(STEP_SEL_1_128);  // 初期は128分割
-  
-  // KVAL設定
-  motor.setHoldKVAL(KVAL_PARAM);
-  motor.setRunKVAL(KVAL_PARAM);
-  motor.setAccKVAL(KVAL_PARAM);
-  motor.setDecKVAL(KVAL_PARAM);
-  
-  // 過電流検出設定
-  motor.setOCThreshold(OCD_THRESHOLD);
-  
-  // 加速・減速設定（スムーズな動作のため）
-  motor.setAcc(0x0A0);  // 加速度
-  motor.setDec(0x0A0);  // 減速度
-  motor.setMaxSpeed(15625);  // 最大速度設定
+  motor.setMicroSteps(128);  // 初期は128分割
+  motor.setAcc(100);         // 加速度
+  motor.setMaxSpeed(800);    // 最大速度
+  motor.setMinSpeed(1);      // 最小速度
+  motor.setThresholdSpeed(1000);  // 閾値速度
+  motor.setOverCurrent(OCD_THRESHOLD);  // 過電流検出
+  motor.setStallCurrent(STALL_CURRENT); // ストール電流
   
   Serial.println("[Motor] L6470 initialized successfully");
   
@@ -160,23 +146,10 @@ void optimizeStepMode(float speed) {
     
     // モータを一時停止
     motor.softStop();
-    while (motor.busyCheck());
+    while (motor.isBusy()) delay(10);
     
     // ステップモード変更
-    switch (newMode) {
-      case STEP_128:
-        motor.configStepMode(STEP_SEL_1_128);
-        break;
-      case STEP_32:
-        motor.configStepMode(STEP_SEL_1_32);
-        break;
-      case STEP_8:
-        motor.configStepMode(STEP_SEL_1_8);
-        break;
-      case STEP_FULL:
-        motor.configStepMode(STEP_SEL_1);
-        break;
-    }
+    motor.setMicroSteps(newMode);
     
     state.stepMode = newMode;
   }
@@ -197,12 +170,14 @@ void setMotorSpeed(float speed) {
     state.currentSpeed = 0;
   } else {
     // 速度をL6470フォーマットに変換
-    unsigned long speedValue = abs(speed);
+    long speedValue = abs(speed);
     
+    // L6470ライブラリのrun関数: run(dir, speed)
+    // dir: 1=正転, 0=逆転
     if (speed > 0) {
-      motor.run(FWD, speedValue);
+      motor.run(1, speedValue);
     } else {
-      motor.run(REV, speedValue);
+      motor.run(0, speedValue);
     }
     
     state.motorRunning = true;
