@@ -31,9 +31,16 @@
 // ============================================================================
 // Wi-Fi設定（環境に合わせて変更してください）
 // ============================================================================
-const char* WIFI_SSID = "your_wifi_ssid";
-const char* WIFI_PASSWORD = "your_wifi_password";
+const char* WIFI_SSID = "SDDLnet";
+const char* WIFI_PASSWORD = "smallbear";
 const char* MDNS_HOSTNAME = "motor";  // motor.local でアクセス可能
+
+// アクセスポイント設定（WiFi接続失敗時に使用）
+const char* AP_SSID = "EtherSpin-ESP";
+const char* AP_PASSWORD = "motor12345";  // 最低8文字必要
+IPAddress AP_IP(192, 168, 4, 1);
+IPAddress AP_GATEWAY(192, 168, 4, 1);
+IPAddress AP_SUBNET(255, 255, 255, 0);
 
 // ============================================================================
 // UDP設定
@@ -101,22 +108,36 @@ struct SystemState {
  */
 void initMotor() {
   Serial.println("[Motor] Initializing L6470...");
+  Serial.printf("[Motor] Pin Config - CS:%d SCK:%d MOSI:%d MISO:%d RST:%d BUSY:%d\n",
+                PIN_CS, PIN_SPI_SCK, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_RESET, PIN_BUSY);
   
   // ピン設定（L6470ライブラリのソフトウェアSPI使用）
+  Serial.println("[Motor] Setting pins...");
   motor.set_pins(PIN_SPI_SCK, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_RESET, PIN_BUSY);
+  Serial.println("[Motor] Pins set successfully");
   
   // 初期化
+  Serial.println("[Motor] Calling motor.init()...");
   motor.init();
+  Serial.println("[Motor] motor.init() completed");
   delay(100);
   
   // L6470パラメータ設定（仕様書準拠）
+  Serial.println("[Motor] Configuring parameters...");
   motor.setMicroSteps(128);  // 初期は128分割
+  Serial.println("[Motor]   - MicroSteps: 128");
   motor.setAcc(100);         // 加速度
+  Serial.println("[Motor]   - Acceleration: 100");
   motor.setMaxSpeed(800);    // 最大速度
+  Serial.println("[Motor]   - MaxSpeed: 800");
   motor.setMinSpeed(1);      // 最小速度
+  Serial.println("[Motor]   - MinSpeed: 1");
   motor.setThresholdSpeed(1000);  // 閾値速度
+  Serial.println("[Motor]   - ThresholdSpeed: 1000");
   motor.setOverCurrent(OCD_THRESHOLD);  // 過電流検出
+  Serial.printf("[Motor]   - OverCurrent: %d mA\n", OCD_THRESHOLD);
   motor.setStallCurrent(STALL_CURRENT); // ストール電流
+  Serial.printf("[Motor]   - StallCurrent: %d mA\n", STALL_CURRENT);
   
   Serial.println("[Motor] L6470 initialized successfully");
   
@@ -142,14 +163,18 @@ void optimizeStepMode(float speed) {
   
   // モード変更が必要な場合
   if (newMode != state.stepMode) {
-    Serial.printf("[Motor] Step mode change: %d -> %d\n", state.stepMode, newMode);
+    Serial.printf("[Motor] Step mode change: %d -> %d (speed: %.2f)\n", state.stepMode, newMode, speed);
     
     // モータを一時停止
+    Serial.println("[Motor] Stopping for mode change...");
     motor.softStop();
     while (motor.isBusy()) delay(10);
+    Serial.println("[Motor] Motor stopped");
     
     // ステップモード変更
+    Serial.printf("[Motor] Setting micro steps to %d\n", newMode);
     motor.setMicroSteps(newMode);
+    Serial.println("[Motor] Mode change completed");
     
     state.stepMode = newMode;
   }
@@ -159,12 +184,15 @@ void optimizeStepMode(float speed) {
  * モータ速度を設定（step/s）
  */
 void setMotorSpeed(float speed) {
+  Serial.printf("[Motor] setMotorSpeed called: %.2f step/s\n", speed);
+  
   // 動的マイクロステップ最適化
   optimizeStepMode(speed);
   
   // 速度設定
   if (abs(speed) < 1.0) {
     // 停止
+    Serial.println("[Motor] Stopping motor (speed < 1.0)");
     motor.softStop();
     state.motorRunning = false;
     state.currentSpeed = 0;
@@ -175,8 +203,10 @@ void setMotorSpeed(float speed) {
     // L6470ライブラリのrun関数: run(dir, speed)
     // dir: 1=正転, 0=逆転
     if (speed > 0) {
+      Serial.printf("[Motor] Running forward at %ld step/s\n", speedValue);
       motor.run(1, speedValue);
     } else {
+      Serial.printf("[Motor] Running reverse at %ld step/s\n", speedValue);
       motor.run(0, speedValue);
     }
     
@@ -185,6 +215,8 @@ void setMotorSpeed(float speed) {
   }
   
   state.targetSpeed = speed;
+  Serial.printf("[Motor] Motor state - Running: %d, Current: %.2f, Target: %.2f\n",
+                state.motorRunning, state.currentSpeed, state.targetSpeed);
 }
 
 /**
@@ -716,8 +748,10 @@ void initWebServer() {
 void initWiFi() {
   Serial.println("[WiFi] Connecting to WiFi...");
   Serial.printf("[WiFi] SSID: %s\n", WIFI_SSID);
+  Serial.printf("[WiFi] Setting WiFi mode to STA...\n");
   
   WiFi.mode(WIFI_STA);
+  Serial.println("[WiFi] Starting connection...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
   int attempts = 0;
@@ -725,19 +759,56 @@ void initWiFi() {
     delay(500);
     Serial.print(".");
     attempts++;
+    if (attempts % 10 == 0) {
+      Serial.printf(" [%d/30]\n", attempts);
+    }
   }
   
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[WiFi] Connected!");
     Serial.printf("[WiFi] IP Address: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("[WiFi] Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+    Serial.printf("[WiFi] Subnet: %s\n", WiFi.subnetMask().toString().c_str());
+    Serial.printf("[WiFi] DNS: %s\n", WiFi.dnsIP().toString().c_str());
+    Serial.printf("[WiFi] Signal Strength (RSSI): %d dBm\n", WiFi.RSSI());
     
     // mDNS設定
+    Serial.println("[mDNS] Starting mDNS responder...");
     if (MDNS.begin(MDNS_HOSTNAME)) {
       Serial.printf("[mDNS] Responder started: http://%s.local\n", MDNS_HOSTNAME);
       MDNS.addService("http", "tcp", 80);
+      Serial.println("[mDNS] HTTP service registered");
+    } else {
+      Serial.println("[mDNS] Failed to start mDNS responder");
     }
   } else {
     Serial.println("\n[WiFi] Connection failed!");
+    Serial.printf("[WiFi] Final status code: %d\n", WiFi.status());
+    Serial.println("[WiFi] Possible reasons:");
+    Serial.println("[WiFi]   - Wrong SSID or password");
+    Serial.println("[WiFi]   - Router out of range");
+    Serial.println("[WiFi]   - Router authentication issues");
+    
+    // アクセスポイントモードで起動
+    Serial.println("\n[WiFi] Starting Access Point mode...");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
+    
+    if (WiFi.softAP(AP_SSID, AP_PASSWORD)) {
+      Serial.println("[WiFi] Access Point started successfully!");
+      Serial.printf("[WiFi] AP SSID: %s\n", AP_SSID);
+      Serial.printf("[WiFi] AP Password: %s\n", AP_PASSWORD);
+      Serial.printf("[WiFi] AP IP Address: %s\n", WiFi.softAPIP().toString().c_str());
+      Serial.println("[WiFi] Connect to this WiFi network to access the web interface");
+      
+      // mDNS設定
+      if (MDNS.begin(MDNS_HOSTNAME)) {
+        Serial.printf("[mDNS] Responder started: http://%s.local\n", MDNS_HOSTNAME);
+        MDNS.addService("http", "tcp", 80);
+      }
+    } else {
+      Serial.println("[WiFi] Failed to start Access Point!");
+    }
   }
 }
 
@@ -752,8 +823,14 @@ void setup() {
   Serial.println("\n\n===========================================");
   Serial.println("EtherSpin-ESP: Stepper Motor Web Controller");
   Serial.println("===========================================\n");
+  Serial.println("[System] Starting initialization sequence...");
+  Serial.printf("[System] ESP32 Chip Model: %s\n", ESP.getChipModel());
+  Serial.printf("[System] Chip Revision: %d\n", ESP.getChipRevision());
+  Serial.printf("[System] CPU Frequency: %d MHz\n", ESP.getCpuFreqMHz());
+  Serial.printf("[System] Free Heap: %d bytes\n", ESP.getFreeHeap());
   
   // システム状態初期化
+  Serial.println("[System] Initializing system state...");
   state.mode = MODE_INTERNAL;
   state.targetSpeed = 0;
   state.currentSpeed = 0;
@@ -761,24 +838,54 @@ void setup() {
   state.lastUdpTime = millis();
   state.motorRunning = false;
   state.emergencyStop = false;
+  Serial.println("[System] System state initialized");
   
   // L6470初期化
+  Serial.println("[System] Step 1/4: Initializing L6470 motor driver...");
   initMotor();
+  Serial.println("[System] Motor driver initialization complete\n");
   
   // Wi-Fi接続
+  Serial.println("[System] Step 2/4: Connecting to WiFi...");
   initWiFi();
+  Serial.println("[System] WiFi initialization complete\n");
   
   // UDP開始
+  Serial.println("[System] Step 3/4: Starting UDP server...");
   udp.begin(UDP_PORT);
   Serial.printf("[UDP] Listening on port %d\n", UDP_PORT);
+  Serial.println("[System] UDP server started\n");
   
   // Webサーバー起動
+  Serial.println("[System] Step 4/4: Starting web server...");
   initWebServer();
+  Serial.println("[System] Web server initialization complete\n");
   
-  Serial.println("\n=== System Ready ===\n");
+  Serial.println("\n=== System Ready ===");
+  Serial.println("Access via:");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("  - http://%s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("  - http://%s.local\n", MDNS_HOSTNAME);
+    Serial.printf("  - UDP: Port %d\n", UDP_PORT);
+  } else if (WiFi.getMode() == WIFI_AP) {
+    Serial.printf("  - Connect to WiFi: %s\n", AP_SSID);
+    Serial.printf("  - Password: %s\n", AP_PASSWORD);
+    Serial.printf("  - Then open: http://%s\n", WiFi.softAPIP().toString().c_str());
+    Serial.printf("  - Or: http://%s.local\n", MDNS_HOSTNAME);
+  } else {
+    Serial.println("  - No network connection");
+  }
+  Serial.println("======================\n");
 }
 
 void loop() {
+  // 起動確認用（最初の1回のみ）
+  static bool firstLoop = true;
+  if (firstLoop) {
+    Serial.println("[Loop] Entering main loop");
+    firstLoop = false;
+  }
+  
   // UDP通信処理
   handleUdpPacket();
   
@@ -791,6 +898,17 @@ void loop() {
     ws.cleanupClients();
     broadcastSystemState();
     lastBroadcast = millis();
+  }
+  
+  // 定期的な状態ログ出力（10秒ごと）
+  static unsigned long lastStatusLog = 0;
+  if (millis() - lastStatusLog > 10000) {
+    Serial.printf("[Status] Mode: %s, Speed: %.2f, Running: %d, Free Heap: %d\n",
+                  state.mode == MODE_INTERNAL ? "INT" : "EXT",
+                  state.currentSpeed,
+                  state.motorRunning,
+                  ESP.getFreeHeap());
+    lastStatusLog = millis();
   }
   
   // 少し待機
