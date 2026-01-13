@@ -37,7 +37,7 @@ const char* MDNS_HOSTNAME = "motor";  // motor.local でアクセス可能
 
 // アクセスポイント設定（WiFi接続失敗時に使用）
 const char* AP_SSID = "EtherSpin-ESP";
-const char* AP_PASSWORD = "motor12345";  // 最低8文字必要
+const char* AP_PASSWORD = " ";  // 最低8文字必要
 IPAddress AP_IP(192, 168, 4, 1);
 IPAddress AP_GATEWAY(192, 168, 4, 1);
 IPAddress AP_SUBNET(255, 255, 255, 0);
@@ -892,11 +892,14 @@ void loop() {
   // ウォッチドッグチェック
   checkWatchdog();
   
-  // WebSocket状態ブロードキャスト（100msごと）
+  // WebSocket状態ブロードキャスト（500msごと、クライアント接続時のみ）
   static unsigned long lastBroadcast = 0;
-  if (millis() - lastBroadcast > 100) {
+  if (millis() - lastBroadcast > 500) {
     ws.cleanupClients();
-    broadcastSystemState();
+    // クライアントが接続されている場合のみブロードキャスト
+    if (ws.count() > 0) {
+      broadcastSystemState();
+    }
     lastBroadcast = millis();
   }
   
