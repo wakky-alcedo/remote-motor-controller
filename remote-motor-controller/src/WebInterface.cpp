@@ -7,6 +7,7 @@
  */
 
 #include "WebInterface.h"
+#include "config.h"
 
 // ============================================================================
 // コンストラクタ / デストラクタ
@@ -158,7 +159,9 @@ void WebInterface::handleWebSocketMessage(uint8_t *data, size_t len) {
 }
 
 const char* WebInterface::getIndexHTML() {
-  return R"rawliteral(
+  // MOTOR_MAX_SPEEDに基づいて動的にHTMLを生成
+  static String html;
+  html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -367,12 +370,20 @@ const char* WebInterface::getIndexHTML() {
                 <label style="display: block; margin-bottom: 10px; font-weight: 600;">
                     速度調整: <span id="speedValue">0</span> step/s
                 </label>
-                <input type="range" min="-3000" max="3000" value="0" class="slider" 
+                <input type="range" min=")rawliteral";
+  html += String(-MOTOR_MAX_SPEED);
+  html += R"rawliteral(" max=")rawliteral";
+  html += String(MOTOR_MAX_SPEED);
+  html += R"rawliteral(" value="0" class="slider" 
                        id="speedSlider" oninput="updateSpeedDisplay(this.value)">
                 <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #666;">
-                    <span>-3000</span>
+                    <span>)rawliteral";
+  html += String(-MOTOR_MAX_SPEED);
+  html += R"rawliteral(</span>
                     <span>0</span>
-                    <span>3000</span>
+                    <span>)rawliteral";
+  html += String(MOTOR_MAX_SPEED);
+  html += R"rawliteral(</span>
                 </div>
             </div>
 
@@ -483,4 +494,6 @@ const char* WebInterface::getIndexHTML() {
 </body>
 </html>
 )rawliteral";
+  
+  return html.c_str();
 }

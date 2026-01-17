@@ -52,17 +52,17 @@ bool MotorController::init() {
   motor_.setMicroSteps(128);  // 初期は128分割
   Serial.println("[MotorController]   - MicroSteps: 128");
   
-  motor_.setAcc(100);         // 加速度
-  Serial.println("[MotorController]   - Acceleration: 100");
+  motor_.setAcc(MOTOR_ACCELERATION);         // 加速度
+  Serial.printf("[MotorController]   - Acceleration: %d\n", MOTOR_ACCELERATION);
   
-  motor_.setMaxSpeed(800);    // 最大速度
-  Serial.println("[MotorController]   - MaxSpeed: 800");
+  motor_.setMaxSpeed(MOTOR_MAX_SPEED);    // 最大速度
+  Serial.printf("[MotorController]   - MaxSpeed: %d\n", MOTOR_MAX_SPEED);
   
-  motor_.setMinSpeed(1);      // 最小速度
-  Serial.println("[MotorController]   - MinSpeed: 1");
+  motor_.setMinSpeed(MOTOR_MIN_SPEED);      // 最小速度
+  Serial.printf("[MotorController]   - MinSpeed: %d\n", MOTOR_MIN_SPEED);
   
-  motor_.setThresholdSpeed(1000);  // 閾値速度
-  Serial.println("[MotorController]   - ThresholdSpeed: 1000");
+  motor_.setThresholdSpeed(MOTOR_THRESHOLD_SPEED);  // 闾値速度
+  Serial.printf("[MotorController]   - ThresholdSpeed: %d\n", MOTOR_THRESHOLD_SPEED);
   
   motor_.setOverCurrent(OCD_THRESHOLD);  // 過電流検出
   Serial.printf("[MotorController]   - OverCurrent: %d mA\n", OCD_THRESHOLD);

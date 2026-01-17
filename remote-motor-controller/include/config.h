@@ -24,6 +24,12 @@
 #define KVAL_PARAM 0x29        // KVAL_HOLD/RUN/ACC/DEC
 #define OCD_THRESHOLD 0x0F     // 過電流検出 (3.375A)
 
+// L6470 動作パラメータ
+#define MOTOR_MAX_SPEED 3000      // 最大速度 (step/s)
+#define MOTOR_MIN_SPEED 1         // 最小速度 (step/s)
+#define MOTOR_ACCELERATION 100    // 加速度 (step/s/s)
+#define MOTOR_THRESHOLD_SPEED 1000 // フルステップ切替速度 (step/s) - この速度を超えるとフルステップモードに移行
+
 // 動的マイクロステップ最適化の閾値
 #define SPEED_THRESHOLD_LOW  500    // 128→32分割への遷移点
 #define SPEED_THRESHOLD_HIGH 2000   // 32→8分割への遷移点
