@@ -1,42 +1,42 @@
 /**
  * MotorController.h
- * L6470ステッピングモータドライバ制御クラス
+ * モーター制御統合クラス（ドライバー抽象化層）
+ * 
+ * DCモーターとステッピングモーター間の切り替えをconfig.hで実現
  * 
  * @author SDDL Project
- * @date 2026/01/17
+ * @date 2026/01/18
  */
 
 #ifndef MOTOR_CONTROLLER_H
 #define MOTOR_CONTROLLER_H
 
 #include <Arduino.h>
-#include <L6470.h>
 #include "config.h"
 #include "SystemState.h"
+#include "IMotorDriver.h"
 
-// ============================================================================
-// ピン定義 (XIAO ESP32C3用)
-// ============================================================================
-#define PIN_SPI_SCK   D8   // SCK
-#define PIN_SPI_MISO  D9   // MISO
-#define PIN_SPI_MOSI  D10  // MOSI
-#define PIN_CS        D7   // Chip Select
-#define PIN_BUSY      D6   // BUSY Signal
-#ifndef PIN_RESET
-#define PIN_RESET     D5   // RESET Signal
+// config.hの設定に基づいて適切なドライバーをインクルード
+#ifdef MOTOR_TYPE_DC
+  #include "DCMotorDriver.h"
+#else
+  #include "StepperMotorDriver.h"
 #endif
 
 // ============================================================================
-// L6470パラメータ設定（config.hから読み込み）
+// MotorController クラス（ファサードパターン）
 // ============================================================================
-// KVAL_PARAM, SPEED_THRESHOLD_LOW, SPEED_THRESHOLD_HIGHはconfig.hで定義
-
-// STALL_CURRENTはmA単位で設定（OCD_THRESHOLDはconfig.hで定義）
-#define STALL_CURRENT 3000 // ストール電流 (mA)
-
-// ============================================================================
-// MotorController クラス
-// ============================================================================
+/**
+ * モーター制御統合クラス
+ * 
+ * IMotorDriverインターフェースを使用し、config.hの設定に基づいて
+ * DCモーターまたはステッピングモーターを自動的に選択します。
+ * 
+ * 使用例:
+ *   MotorController motor;
+ *   motor.init();
+ *   motor.setSpeed(50.0, stepMode);  // DCモード: 50%、ステッパー: 50 step/s
+ */
 class MotorController {
 public:
   /**
@@ -57,7 +57,7 @@ public:
   
   /**
    * モータ速度を設定
-   * @param speed 目標速度 (step/s、負値で逆転)
+   * @param speed 目標速度（DCモード: %, ステッパーモード: step/s、負値で逆転）
    * @param currentStepMode 現在のステップモード（参照渡しで更新）
    * @return 成功時true
    */
@@ -81,7 +81,7 @@ public:
   
   /**
    * 現在の速度を取得
-   * @return 現在速度 (step/s)
+   * @return 現在速度
    */
   float getCurrentSpeed();
   
@@ -98,24 +98,7 @@ public:
   StepMode getStepMode() const;
   
 private:
-  L6470 motor_;                // L6470ドライバインスタンス
-  float currentSpeed_;         // 現在速度 (step/s)
-  float targetSpeed_;          // 目標速度 (step/s)
-  StepMode currentStepMode_;   // 現在のマイクロステップ設定
-  bool isRunning_;             // モータ動作中フラグ
-  
-  /**
-   * 動的マイクロステップ最適化
-   * 速度域に応じて最適なマイクロステップ設定に自動遷移
-   * @param speed 目標速度
-   */
-  void optimizeStepMode(float speed);
-  
-  /**
-   * マイクロステップモードを変更
-   * @param newMode 新しいステップモード
-   */
-  void changeStepMode(StepMode newMode);
+  IMotorDriver* driver_;  // モータードライバーインターフェース（ポリモーフィズム）
 };
 
 #endif // MOTOR_CONTROLLER_H

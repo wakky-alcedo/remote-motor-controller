@@ -7,6 +7,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// ============================================================================
+// モータータイプ選択
+// ============================================================================
+// 使用するモータータイプを選択してください
+// MOTOR_TYPE_STEPPER: L6470ステッピングモーター
+// MOTOR_TYPE_DC:      DCモーター（PWM制御）
+#define MOTOR_TYPE_DC       // DCモーターを使用
+// #define MOTOR_TYPE_STEPPER  // ステッピングモーターを使用（コメントアウトを切り替え）
+
 // Wi-Fi設定（ここを環境に合わせて変更してください）
 #define WIFI_SSID     "Kawasemi-G"      // 例: "your_wifi_ssid"
 #define WIFI_PASSWORD "most9849"        // 例: "your_wifi_password"
