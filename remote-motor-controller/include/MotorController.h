@@ -16,12 +16,12 @@
 // ============================================================================
 // ピン定義 (XIAO ESP32C3用)
 // ============================================================================
-#define PIN_SPI_SCK   8   // SCK
-#define PIN_SPI_MISO  9   // MISO
-#define PIN_SPI_MOSI  10  // MOSI
-#define PIN_CS        7   // Chip Select
-#define PIN_BUSY      6   // BUSY Signal
-#define PIN_RESET     5   // RESET Signal
+#define PIN_SPI_SCK   D8   // SCK
+#define PIN_SPI_MISO  D9   // MISO
+#define PIN_SPI_MOSI  D10  // MOSI
+#define PIN_CS        D7   // Chip Select
+#define PIN_BUSY      D6   // BUSY Signal
+#define PIN_RESET     D5   // RESET Signal
 
 // ============================================================================
 // L6470パラメータ設定
