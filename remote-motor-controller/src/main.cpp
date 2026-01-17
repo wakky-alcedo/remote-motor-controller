@@ -31,8 +31,10 @@
 // ============================================================================
 // Wi-Fi設定（環境に合わせて変更してください）
 // ============================================================================
-const char* WIFI_SSID = "SDDLnet";
-const char* WIFI_PASSWORD = "smallbear";
+// const char* WIFI_SSID = "SDDLnet";
+// const char* WIFI_PASSWORD = "smallbear";
+const char* WIFI_SSID = "Kawasemi-G";
+const char* WIFI_PASSWORD = "most9849";
 const char* MDNS_HOSTNAME = "motor";  // motor.local でアクセス可能
 
 // アクセスポイント設定（WiFi接続失敗時に使用）
