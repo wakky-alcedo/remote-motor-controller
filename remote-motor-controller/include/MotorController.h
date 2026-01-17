@@ -82,7 +82,7 @@ public:
    * 現在の速度を取得
    * @return 現在速度 (step/s)
    */
-  float getCurrentSpeed() const;
+  float getCurrentSpeed();
   
   /**
    * モータの動作状態を取得

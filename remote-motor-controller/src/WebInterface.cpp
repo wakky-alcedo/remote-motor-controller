@@ -64,6 +64,10 @@ void WebInterface::broadcastState(const SystemState& state) {
   
   String output;
   serializeJson(doc, output);
+  
+  // デバッグ: ブロードキャストする内容を表示
+  Serial.printf("[WebInterface] Broadcasting: %s\n", output.c_str());
+  
   ws_.textAll(output);
 }
 

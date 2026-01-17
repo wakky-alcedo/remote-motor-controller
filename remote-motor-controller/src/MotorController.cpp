@@ -150,8 +150,26 @@ bool MotorController::isBusy() {
   return motor_.isBusy();
 }
 
-float MotorController::getCurrentSpeed() const {
-  return currentSpeed_;
+float MotorController::getCurrentSpeed() {
+  // L6470のSPEEDレジスタから実際の速度を読み取る
+  // GetParam(0x04)でSPEEDレジスタ（20bit）を取得
+  unsigned long speedReg = motor_.GetParam(0x04);
+  
+  // SPEEDレジスタ値を実際のstep/sに変換
+  // 変換式: step/s = speedReg / 67.106 (または speedReg * 0.01490116119384766)
+  float actualSpeed = (float)speedReg / 67.106f;
+  
+  // STATUSレジスタから回転方向を取得（bit 4 = DIR）
+  unsigned int status = motor_.getStatus();
+  bool isForward = (status & 0x0010) != 0;  // bit 4
+  
+  // 方向を考慮して符号付き速度を返す
+  // ただし、停止中（speed < 1）の場合は0を返す
+  if (actualSpeed < 1.0f) {
+    return 0.0f;
+  }
+  
+  return isForward ? actualSpeed : -actualSpeed;
 }
 
 bool MotorController::isRunning() const {

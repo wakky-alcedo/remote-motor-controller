@@ -235,6 +235,10 @@ void SystemController::broadcastState() {
     state_.motorRunning = motor_.isRunning();
     state_.stepMode = motor_.getStepMode();
     
+    // デバッグ: 取得した速度を表示
+    Serial.printf("[SystemController] Broadcasting - Current: %.2f, Target: %.2f, Running: %d\n",
+                  state_.currentSpeed, state_.targetSpeed, state_.motorRunning);
+    
     // ブロードキャスト
     web_.broadcastState(state_);
   }
@@ -252,15 +256,25 @@ void SystemController::setMotorSpeedInternal(float speed) {
   Serial.printf("[SystemController] Internal mode - Set speed: %.2f\n", speed);
   motor_.setSpeed(speed, state_.stepMode);
   state_.targetSpeed = speed;
+  
+  // モーター設定後に状態を更新
   state_.currentSpeed = motor_.getCurrentSpeed();
   state_.motorRunning = motor_.isRunning();
+  
+  Serial.printf("[SystemController] State updated - Current: %.2f, Target: %.2f, Running: %d\n",
+                state_.currentSpeed, state_.targetSpeed, state_.motorRunning);
 }
 
 void SystemController::setMotorSpeedExternal(float speed) {
   Serial.printf("[SystemController] External mode - Set speed: %.2f\n", speed);
   motor_.setSpeed(speed, state_.stepMode);
   state_.targetSpeed = speed;
+  
+  // モーター設定後に状態を更新
   state_.currentSpeed = motor_.getCurrentSpeed();
   state_.motorRunning = motor_.isRunning();
   state_.lastUdpTime = millis();
+  
+  Serial.printf("[SystemController] State updated - Current: %.2f, Target: %.2f, Running: %d\n",
+                state_.currentSpeed, state_.targetSpeed, state_.motorRunning);
 }
