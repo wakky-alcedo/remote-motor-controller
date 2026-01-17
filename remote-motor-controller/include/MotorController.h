@@ -11,6 +11,7 @@
 
 #include <Arduino.h>
 #include <L6470.h>
+#include "config.h"
 #include "SystemState.h"
 
 // ============================================================================
@@ -24,15 +25,13 @@
 #define PIN_RESET     D5   // RESET Signal
 
 // ============================================================================
-// L6470パラメータ設定
+// L6470パラメータ設定（config.hから読み込み）
 // ============================================================================
-#define KVAL_PARAM 0x29    // KVAL_HOLD/RUN/ACC/DEC
+// KVAL_PARAM, SPEED_THRESHOLD_LOW, SPEED_THRESHOLD_HIGHはconfig.hで定義
+
+// OCD_THRESHOLDとSTALL_CURRENTはmA単位で設定
 #define OCD_THRESHOLD 6000 // 過電流検出 (mA)
 #define STALL_CURRENT 3000 // ストール電流 (mA)
-
-// 速度閾値（step/s）
-#define SPEED_THRESHOLD_LOW  500    // 128→32分割への遷移点
-#define SPEED_THRESHOLD_HIGH 2000   // 32→8分割への遷移点
 
 // ============================================================================
 // MotorController クラス

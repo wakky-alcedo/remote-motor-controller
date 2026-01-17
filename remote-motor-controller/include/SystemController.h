@@ -10,6 +10,7 @@
 #define SYSTEM_CONTROLLER_H
 
 #include <Arduino.h>
+#include "config.h"
 #include "SystemState.h"
 #include "MotorController.h"
 #include "NetworkManager.h"
@@ -17,29 +18,15 @@
 #include "WebInterface.h"
 
 // ============================================================================
-// WiFi設定（環境に合わせて変更してください）
+// WiFi設定（config.hから読み込み）
 // ============================================================================
-#ifndef WIFI_SSID
-#define WIFI_SSID "Kawasemi-G"
-#endif
-
-#ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD "most9849"
-#endif
+// WIFI_SSID, WIFI_PASSWORD, MDNS_HOSTNAME, UDP_PORT, WATCHDOG_TIMEOUT_MS
+// はconfig.hで定義されています
 
 // アクセスポイント設定
 #define AP_SSID "EtherSpin-ESP"
-#define AP_PASSWORD " "
+#define AP_PASSWORD "12345678"
 #define AP_IP_ADDR 192, 168, 4, 1
-
-// mDNS設定
-#define MDNS_HOSTNAME "motor"
-
-// UDP設定
-#define UDP_PORT 8888
-
-// ウォッチドッグタイムアウト
-#define WATCHDOG_TIMEOUT_MS 1000
 
 // 状態ブロードキャスト間隔
 #define BROADCAST_INTERVAL_MS 500
