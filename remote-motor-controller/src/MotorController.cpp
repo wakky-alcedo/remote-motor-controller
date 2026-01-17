@@ -70,6 +70,14 @@ bool MotorController::init() {
   motor_.setStallCurrent(STALL_CURRENT); // ストール電流
   Serial.printf("[MotorController]   - StallCurrent: %d mA\n", STALL_CURRENT);
   
+  // KVAL設定（モータ駆動電圧）
+  Serial.println("[MotorController]   - Setting KVAL parameters...");
+  motor_.SetParam(0x09, KVAL_PARAM);  // KVAL_HOLD
+  motor_.SetParam(0x0A, KVAL_PARAM);  // KVAL_RUN
+  motor_.SetParam(0x0B, KVAL_PARAM);  // KVAL_ACC
+  motor_.SetParam(0x0C, KVAL_PARAM);  // KVAL_DEC
+  Serial.printf("[MotorController]   - KVAL: 0x%02X\n", KVAL_PARAM);
+  
   Serial.println("[MotorController] L6470 initialized successfully");
   
   currentStepMode_ = STEP_128;
@@ -99,17 +107,17 @@ bool MotorController::setSpeed(float speed, StepMode& currentStepMode) {
     isRunning_ = false;
     currentSpeed_ = 0.0f;
   } else {
-    // 速度をL6470フォーマットに変換
-    long speedValue = abs(speed);
-    
     // L6470ライブラリのrun関数: run(dir, speed)
-    // dir: 1=正転, 0=逆転
+    // dir: dSPIN_FWD(1)=正転, dSPIN_REV(0)=逆転
+    // speed: float値をstep/sで指定（ライブラリ内部でSpdCalc()により変換される）
+    float absSpeed = abs(speed);
+    
     if (speed > 0) {
-      Serial.printf("[MotorController] Running forward at %ld step/s\n", speedValue);
-      motor_.run(1, speedValue);
+      Serial.printf("[MotorController] Running forward at %.2f step/s\n", absSpeed);
+      motor_.run(1, absSpeed);  // dSPIN_FWD = 1
     } else {
-      Serial.printf("[MotorController] Running reverse at %ld step/s\n", speedValue);
-      motor_.run(0, speedValue);
+      Serial.printf("[MotorController] Running reverse at %.2f step/s\n", absSpeed);
+      motor_.run(0, absSpeed);  // dSPIN_REV = 0
     }
     
     isRunning_ = true;
