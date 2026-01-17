@@ -49,8 +49,8 @@ bool MotorController::init() {
   
   // L6470パラメータ設定（仕様書準拠）
   Serial.println("[MotorController] Configuring parameters...");
-  motor_.setMicroSteps(128);  // 初期は128分割
-  Serial.println("[MotorController]   - MicroSteps: 128");
+  motor_.setMicroSteps(8);  // 固定で8分割（速度変更時に停止しない）
+  Serial.println("[MotorController]   - MicroSteps: 8 (fixed)");
   
   motor_.setAcc(MOTOR_ACCELERATION);         // 加速度
   Serial.printf("[MotorController]   - Acceleration: %d\n", MOTOR_ACCELERATION);
@@ -80,7 +80,7 @@ bool MotorController::init() {
   
   Serial.println("[MotorController] L6470 initialized successfully");
   
-  currentStepMode_ = STEP_128;
+  currentStepMode_ = STEP_8;  // 固定で8分割を使用
   isRunning_ = false;
   currentSpeed_ = 0.0f;
   targetSpeed_ = 0.0f;
@@ -93,8 +93,8 @@ bool MotorController::setSpeed(float speed, StepMode& currentStepMode) {
   
   targetSpeed_ = speed;
   
-  // 動的マイクロステップ最適化
-  optimizeStepMode(speed);
+  // 動的マイクロステップ最適化を無効化（速度変更時の停止を回避）
+  // optimizeStepMode(speed);
   
   // 外部に現在のステップモードを反映
   currentStepMode = currentStepMode_;

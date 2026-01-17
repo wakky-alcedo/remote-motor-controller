@@ -22,15 +22,16 @@
 #define PIN_SPI_MOSI  D10  // MOSI
 #define PIN_CS        D7   // Chip Select
 #define PIN_BUSY      D6   // BUSY Signal
+#ifndef PIN_RESET
 #define PIN_RESET     D5   // RESET Signal
+#endif
 
 // ============================================================================
 // L6470パラメータ設定（config.hから読み込み）
 // ============================================================================
 // KVAL_PARAM, SPEED_THRESHOLD_LOW, SPEED_THRESHOLD_HIGHはconfig.hで定義
 
-// OCD_THRESHOLDとSTALL_CURRENTはmA単位で設定
-#define OCD_THRESHOLD 6000 // 過電流検出 (mA)
+// STALL_CURRENTはmA単位で設定（OCD_THRESHOLDはconfig.hで定義）
 #define STALL_CURRENT 3000 // ストール電流 (mA)
 
 // ============================================================================

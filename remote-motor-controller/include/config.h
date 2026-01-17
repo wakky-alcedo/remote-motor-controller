@@ -20,18 +20,42 @@
 // ウォッチドッグタイムアウト（ミリ秒）
 #define WATCHDOG_TIMEOUT_MS 1000
 
+// ============================================================================
 // L6470 電気的パラメータ
-#define KVAL_PARAM 0x29        // KVAL_HOLD/RUN/ACC/DEC
-#define OCD_THRESHOLD 0x0F     // 過電流検出 (3.375A)
+// ============================================================================
+
+// KVAL (Konstant Voltage) - モーターへの供給電圧制御
+// 範囲: 0x00～0xFF (0～255)
+// 計算式: 実効電圧% = (KVAL / 255) × 100
+// 
+// KVAL_HOLD: 停止時の保持トルク電圧
+// KVAL_RUN:  定速運転時の電圧
+// KVAL_ACC:  加速時の電圧
+// KVAL_DEC:  減速時の電圧
+//
+// 設定値の目安:
+//   0x29 (41)  = 16%  - 低電圧、低トルク、省電力（脱調しやすい）
+//   0x80 (128) = 50%  - 標準的な設定
+//   0xC0 (192) = 75%  - 高トルク、高速回転に対応（推奨）
+//   0xFF (255) = 100% - 最大電圧（発熱・過電流に注意）
+//
+// 注意: 低すぎると高速時に脱調、高すぎると発熱や過電流のリスク
+#define KVAL_PARAM 0xC0        // 0xC0 = 192 = 75%電圧（高速・高トルク用）
+
+// 過電流検出閾値
+// 範囲: 0x00～0x0F (375mA～6000mA、15段階)
+// 計算式: 電流(A) = (THRESHOLD + 1) × 0.375A
+// 0x0F = 16 × 0.375A = 6.0A
+#define OCD_THRESHOLD 0x0F     // 過電流検出 (6.0A)
 
 // L6470 動作パラメータ
 #define MOTOR_MAX_SPEED 3000      // 最大速度 (step/s)
 #define MOTOR_MIN_SPEED 1         // 最小速度 (step/s)
-#define MOTOR_ACCELERATION 100    // 加速度 (step/s/s)
-#define MOTOR_THRESHOLD_SPEED 1000 // フルステップ切替速度 (step/s) - この速度を超えるとフルステップモードに移行
+#define MOTOR_ACCELERATION 50     // 加速度 (step/s/s) - ゆっくり加速して脱調を防止
+#define MOTOR_THRESHOLD_SPEED 800 // フルステップ切替速度 (step/s) - この速度を超えるとフルステップモードに移行
 
 // 動的マイクロステップ最適化の閾値
-#define SPEED_THRESHOLD_LOW  500    // 128→32分割への遷移点
-#define SPEED_THRESHOLD_HIGH 2000   // 32→8分割への遷移点
+#define SPEED_THRESHOLD_LOW  300    // 128→32分割への遷移点（低速域）
+#define SPEED_THRESHOLD_HIGH 800    // 32→8分割への遷移点（高速域、脱調防止のため早めに切替）
 
 #endif // CONFIG_H
