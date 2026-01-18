@@ -89,3 +89,15 @@ StepMode MotorController::getStepMode() const {
   }
   return driver_->getStepMode();
 }
+
+void MotorController::updatePID() {
+#ifdef MOTOR_TYPE_DC
+  // DCMotorDriverに静的キャストしてupdatePID()を呼び出す
+  // MOTOR_TYPE_DCが定義されている場合、driver_は必ずDCMotorDriverなので安全
+  DCMotorDriver* dcDriver = static_cast<DCMotorDriver*>(driver_);
+  if (dcDriver != nullptr) {
+    dcDriver->updatePID();
+  }
+#endif
+  // ステッピングモーターの場合は何もしない
+}

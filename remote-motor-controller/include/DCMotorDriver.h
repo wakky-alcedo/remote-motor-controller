@@ -19,6 +19,7 @@
 #define DC_PIN_PWM_A      D8   // PWM出力A (モーター正転制御)
 #define DC_PIN_PWM_B      D9   // PWM出力B (モーター逆転制御)
 #define DC_PIN_ENABLE     D10  // イネーブル信号（オプション）
+#define ENCODER_PIN       D4   // エンコーダ入力 (オプション)
 
 // ============================================================================
 // PWMパラメータ
@@ -48,11 +49,40 @@ public:
   virtual float getCurrentSpeed() override;
   virtual bool isRunning() const override;
   virtual StepMode getStepMode() const override;
+  
+  /**
+   * PID制御更新（定期的に呼び出す必要あり）
+   */
+  void updatePID();
+  
+  /**
+   * 現在のRPMを取得
+   * @return RPM値
+   */
+  float getCurrentRPM() const;
+  
+  /**
+   * エンコーダー割り込みハンドラ（静的メソッド）
+   */
+  static void IRAM_ATTR encoderISR();
 
 private:
   float currentSpeed_;         // 現在速度 (-100.0 〜 +100.0 %)
   float targetSpeed_;          // 目標速度
+  float targetRPM_;            // 目標RPM
   bool isRunning_;             // モータ動作中フラグ
+  
+  // エンコーダー関連
+  static volatile unsigned long encoderCount_;  // エンコーダーパルスカウント
+  unsigned long lastEncoderCount_;              // 前回のカウント
+  unsigned long lastRPMUpdateTime_;             // 前回のRPM更新時刻
+  float currentRPM_;                            // 現在のRPM
+  
+  // PID制御関連
+  float pidIntegral_;          // PID積分項
+  float pidLastError_;         // PID前回誤差（微分計算用）
+  unsigned long lastPIDTime_;  // 前回のPID更新時刻
+  bool pidEnabled_;            // PID制御有効フラグ
   
   /**
    * PWMデューティ比を設定
@@ -66,6 +96,20 @@ private:
    * @return PWMデューティ比 (0-255)
    */
   uint8_t speedToDuty(float speed);
+  
+  /**
+   * RPMを計算
+   */
+  void calculateRPM();
+  
+  /**
+   * PID制御でPWM出力を計算
+   * @return PWM出力値（%）
+   */
+  float calculatePID();
+  
+  // 静的インスタンスポインタ（割り込みハンドラ用）
+  static DCMotorDriver* instance_;
 };
 
 #endif // DC_MOTOR_DRIVER_H

@@ -119,6 +119,9 @@ void SystemController::update() {
   // ウォッチドッグチェック
   checkWatchdog();
   
+  // PID制御更新（DCモーターの場合のみ）
+  motor_.updatePID();
+  
   // 状態ブロードキャスト（500msごと、クライアント接続時のみ）
   unsigned long now = millis();
   if (now - lastBroadcastTime_ > BROADCAST_INTERVAL_MS) {

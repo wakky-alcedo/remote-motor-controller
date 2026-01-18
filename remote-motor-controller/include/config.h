@@ -69,4 +69,20 @@
 #define SPEED_THRESHOLD_LOW  300    // 128→32分割への遷移点（低速域）
 #define SPEED_THRESHOLD_HIGH 800    // 32→8分割への遷移点（高速域、脱調防止のため早めに切替）
 
+// ============================================================================
+// DCモーター - エンコーダー設定
+// ============================================================================
+#define ENCODER_PPR 36          // エンコーダーのパルス/回転数（Pulse Per Revolution）
+#define RPM_UPDATE_INTERVAL 100 // RPM計算更新間隔（ミリ秒）
+
+// ============================================================================
+// DCモーター - PID制御パラメータ
+// ============================================================================
+// PID制御: PWM出力 = Kp*誤差 + Ki*積分 + Kd*微分
+#define PID_KP 1.0f             // 比例ゲイン（Proportional）
+#define PID_KI 0.5f             // 積分ゲイン（Integral）
+#define PID_KD 0.1f             // 微分ゲイン（Derivative）
+#define PID_OUTPUT_LIMIT 100.0f // PID出力上限（PWM %）
+#define PID_INTEGRAL_LIMIT 50.0f // 積分項の上限（ワインドアップ防止）
+
 #endif // CONFIG_H

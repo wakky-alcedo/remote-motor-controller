@@ -97,6 +97,11 @@ public:
    */
   StepMode getStepMode() const;
   
+  /**
+   * PID制御更新（DCモーター専用、定期的に呼び出す）
+   */
+  void updatePID();
+  
 private:
   IMotorDriver* driver_;  // モータードライバーインターフェース（ポリモーフィズム）
 };
