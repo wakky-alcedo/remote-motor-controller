@@ -103,7 +103,8 @@ bool DCMotorDriver::setSpeed(float speed, StepMode& currentStepMode) {
   
   if (isRPMMode) {
     // RPM指定モード
-    targetRPM_ = speed;
+    targetRPM_ = speed;  // 符号を保持（正：正転、負：逆転）
+    pidEnabled_ = true;   // PID有効化
     Serial.printf("[DCMotor] setSpeed called: %.2f RPM (PID control)\n", targetRPM_);
     
     if (abs(targetRPM_) < 1.0f) {
@@ -267,7 +268,16 @@ void DCMotorDriver::calculateRPM() {
   // RPM計算
   // RPM = (パルス数 / PPR) / (時間[秒]) * 60
   float deltaTimeSeconds = deltaTime / 1000.0f;
-  currentRPM_ = (deltaPulses / (float)ENCODER_PPR) / deltaTimeSeconds * 60.0f;
+  float absRPM = (deltaPulses / (float)ENCODER_PPR) / deltaTimeSeconds * 60.0f;
+  
+  // 方向を決定：targetRPM_の符号に合わせる
+  // モーター停止中は符号を保持しない
+  if (isRunning_ && targetRPM_ != 0.0f) {
+    currentRPM_ = (targetRPM_ > 0) ? absRPM : -absRPM;
+  } else {
+    // 停止中または手動回転の場合は絶対値
+    currentRPM_ = absRPM;
+  }
   
   // 次回計算用に値を保存
   lastEncoderCount_ = currentCount;
