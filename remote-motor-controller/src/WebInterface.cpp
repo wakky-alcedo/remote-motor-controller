@@ -340,12 +340,24 @@ const char* WebInterface::getIndexHTML() {
                 <div class="status-item">
                     <div class="status-label">現在速度</div>
                     <div class="status-value" id="currentSpeed">0</div>
-                    <div style="font-size: 0.8em; color: #999;">step/s</div>
+                    <div style="font-size: 0.8em; color: #999;" id="currentSpeedUnit">)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(RPM)rawliteral";
+  #else
+  html += R"rawliteral(step/s)rawliteral";
+  #endif
+  html += R"rawliteral(</div>
                 </div>
                 <div class="status-item">
                     <div class="status-label">目標速度</div>
                     <div class="status-value" id="targetSpeed">0</div>
-                    <div style="font-size: 0.8em; color: #999;">step/s</div>
+                    <div style="font-size: 0.8em; color: #999;" id="targetSpeedUnit">)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(RPM)rawliteral";
+  #else
+  html += R"rawliteral(step/s)rawliteral";
+  #endif
+  html += R"rawliteral(</div>
                 </div>
                 <div class="status-item">
                     <div class="status-label">制御モード</div>
@@ -372,21 +384,43 @@ const char* WebInterface::getIndexHTML() {
 
             <div class="slider-container">
                 <label style="display: block; margin-bottom: 10px; font-weight: 600;">
-                    速度調整: <span id="speedValue">0</span> step/s
+                    速度調整: <span id="speedValue">0</span> <span id="speedSliderUnit">)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(RPM)rawliteral";
+  #else
+  html += R"rawliteral(step/s)rawliteral";
+  #endif
+  html += R"rawliteral(</span>
                 </label>
                 <input type="range" min=")rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += String(-DC_MOTOR_MAX_RPM);
+  #else
   html += String(-MOTOR_MAX_SPEED);
+  #endif
   html += R"rawliteral(" max=")rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += String(DC_MOTOR_MAX_RPM);
+  #else
   html += String(MOTOR_MAX_SPEED);
+  #endif
   html += R"rawliteral(" value="0" class="slider" 
                        id="speedSlider" oninput="updateSpeedDisplay(this.value)">
                 <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #666;">
                     <span>)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += String(-DC_MOTOR_MAX_RPM);
+  #else
   html += String(-MOTOR_MAX_SPEED);
+  #endif
   html += R"rawliteral(</span>
                     <span>0</span>
                     <span>)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += String(DC_MOTOR_MAX_RPM);
+  #else
   html += String(MOTOR_MAX_SPEED);
+  #endif
   html += R"rawliteral(</span>
                 </div>
             </div>
