@@ -24,7 +24,7 @@
 // ============================================================================
 // PWMパラメータ
 // ============================================================================
-#define DC_PWM_FREQ       20000  // PWM周波数 (Hz) - 可聴域外
+#define DC_PWM_FREQ       1000  // PWM周波数 (Hz) - 可聴域外
 #define DC_PWM_RESOLUTION 8      // PWM分解能 (bit) - 0〜255
 #define DC_PWM_CHANNEL_A  0      // PWMチャンネルA
 #define DC_PWM_CHANNEL_B  1      // PWMチャンネルB
