@@ -98,57 +98,31 @@ bool DCMotorDriver::init() {
 }
 
 bool DCMotorDriver::setSpeed(float speed, StepMode& currentStepMode) {
-  // speedはRPM単位を想定（PID制御時）または%単位（互換モード）
+  // DCモーターは常にRPM単位でPID制御を使用
   
-  // 値が大きい場合はRPM指定とみなす
-  bool isRPMMode = abs(speed) > 100.0f;
+  targetRPM_ = speed;  // 符号を保持（正：正転、負：逆転）
+  pidEnabled_ = true;   // PID有効化
   
-  if (isRPMMode) {
-    // RPM指定モード
-    targetRPM_ = speed;  // 符号を保持（正：正転、負：逆転）
-    pidEnabled_ = true;   // PID有効化
-    Serial.printf("[DCMotor] setSpeed called: %.2f RPM (PID control)\n", targetRPM_);
-    
-    if (abs(targetRPM_) < 1.0f) {
-      Serial.println("[DCMotor] Stopping motor (RPM < 1)");
-      setPWM(0.0f);
-      isRunning_ = false;
-      currentSpeed_ = 0.0f;
-      pidLastError_ = 0.0f;
-      pidLastError2_ = 0.0f;
-      pidLastOutput_ = 0.0f;
-    } else {
-      isRunning_ = true;
-      // PID制御はupdatePID()で継続的に行う
-    }
+  Serial.printf("[DCMotor] setSpeed called: %.2f RPM (PID control)\n", targetRPM_);
+  
+  if (abs(targetRPM_) < 1.0f) {
+    Serial.println("[DCMotor] Stopping motor (RPM < 1)");
+    setPWM(0.0f);
+    isRunning_ = false;
+    currentSpeed_ = 0.0f;
+    pidLastError_ = 0.0f;
+    pidLastError2_ = 0.0f;
+    pidLastOutput_ = 0.0f;
   } else {
-    // %指定モード（互換性のため）
-    float normalizedSpeed = constrain(speed, -100.0f, 100.0f);
-    
-    Serial.printf("[DCMotor] setSpeed called: %.2f%% (Direct PWM control)\n", normalizedSpeed);
-    
-    targetSpeed_ = normalizedSpeed;
-    targetRPM_ = 0.0f;  // RPMモード無効
-    pidEnabled_ = false;  // PID無効
-    
-    if (abs(normalizedSpeed) < 1.0f) {
-      Serial.println("[DCMotor] Stopping motor (speed < 1%)");
-      setPWM(0.0f);
-      isRunning_ = false;
-      currentSpeed_ = 0.0f;
-    } else {
-      Serial.printf("[DCMotor] Setting speed to %.2f%%\n", normalizedSpeed);
-      setPWM(normalizedSpeed);
-      isRunning_ = true;
-      currentSpeed_ = normalizedSpeed;
-    }
+    isRunning_ = true;
+    // PID制御はupdatePID()で継続的に行う
   }
   
   // StepModeはDCモーターでは使用しないが、互換性のため
   currentStepMode = STEP_FULL;
   
-  Serial.printf("[DCMotor] Motor state - Running: %d, Current: %.2f%%, Target RPM: %.2f\n",
-                isRunning_, currentSpeed_, targetRPM_);
+  Serial.printf("[DCMotor] Motor state - Running: %d, Target RPM: %.2f\n",
+                isRunning_, targetRPM_);
   
   return true;
 }
