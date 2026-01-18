@@ -7,6 +7,7 @@
  */
 
 #include "DCMotorDriver.h"
+#include "float.h"
 
 // ============================================================================
 // 静的メンバー変数の初期化
@@ -210,12 +211,13 @@ void DCMotorDriver::setPWM(float speed) {
   
   uint8_t duty = speedToDuty(abs(speed));
   
-  if (speed > 0) {
+  // 0ではなく0に近い値の場合は停止とみなす→DBL_EPSILONを使用
+  if (speed > DBL_EPSILON) {
     // 正転: PWM_Aに出力、PWM_Bは0
     Serial.printf("[DCMotor] Forward - Duty: %d/255\n", duty);
     ledcWrite(DC_PWM_CHANNEL_A, duty);
     ledcWrite(DC_PWM_CHANNEL_B, 0);
-  } else if (speed < 0) {
+  } else if (speed < -DBL_EPSILON) {
     // 逆転: PWM_Bに出力、PWM_Aは0
     Serial.printf("[DCMotor] Reverse - Duty: %d/255\n", duty);
     ledcWrite(DC_PWM_CHANNEL_A, 0);
