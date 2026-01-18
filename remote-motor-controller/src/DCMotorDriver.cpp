@@ -193,17 +193,17 @@ void DCMotorDriver::setPWM(float speed) {
   // 0ではなく0に近い値の場合は停止とみなす→DBL_EPSILONを使用
   if (speed > DBL_EPSILON) {
     // 正転: PWM_Aに出力、PWM_Bは0
-    Serial.printf("[DCMotor] Forward - Duty: %d/255\n", duty);
+    // Serial.printf("[DCMotor] Forward - Duty: %d/255\n", duty);
     ledcWrite(DC_PWM_CHANNEL_A, duty);
     ledcWrite(DC_PWM_CHANNEL_B, 0);
   } else if (speed < -DBL_EPSILON) {
     // 逆転: PWM_Bに出力、PWM_Aは0
-    Serial.printf("[DCMotor] Reverse - Duty: %d/255\n", duty);
+    // Serial.printf("[DCMotor] Reverse - Duty: %d/255\n", duty);
     ledcWrite(DC_PWM_CHANNEL_A, 0);
     ledcWrite(DC_PWM_CHANNEL_B, duty);
   } else {
     // 停止：両方を0に設定
-    Serial.println("[DCMotor] Stop - Duty: 0/255");
+    // Serial.println("[DCMotor] Stop - Duty: 0/255");
     ledcWrite(DC_PWM_CHANNEL_A, 0);
     ledcWrite(DC_PWM_CHANNEL_B, 0);
   }

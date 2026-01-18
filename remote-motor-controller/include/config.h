@@ -98,8 +98,8 @@
 //   Ki: 定常偏差を減らす。大きいほど正確に収束するが、オーバーシュートしやすい
 //   Kd: 振動を抑える。急激な変化にブレーキをかける
 //
-#define PID_KP 0.0f             // 比例ゲイン（Proportional）
-#define PID_KI 0.2f             // 積分ゲイン（Integral）
+#define PID_KP 0.01f             // 比例ゲイン（Proportional）
+#define PID_KI 0.1f             // 積分ゲイン（Integral）
 #define PID_KD 0.00f            // 微分ゲイン（Derivative）
 #define PID_OUTPUT_LIMIT 100.0f // PID出力上限（PWM %）
 
