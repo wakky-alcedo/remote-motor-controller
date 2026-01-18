@@ -183,12 +183,9 @@ bool DCMotorDriver::isBusy() {
 }
 
 float DCMotorDriver::getCurrentSpeed() {
-  // エンコーダーがある場合はRPMを返す
-  if (pidEnabled_ && targetRPM_ != 0.0f) {
-    return currentRPM_;
-  }
-  // PWM制御モードの場合は設定速度を返す
-  return currentSpeed_;
+  // エンコーダーがある場合は常にRPMを返す（手動回転も検出）
+  // PID制御の有無に関わらず、実際の回転速度を表示
+  return currentRPM_;
 }
 
 bool DCMotorDriver::isRunning() const {
@@ -330,12 +327,13 @@ float DCMotorDriver::calculatePID() {
 }
 
 void DCMotorDriver::updatePID() {
+  // RPM計算は常に実行（手動回転も検出するため）
+  calculateRPM();
+  
+  // PID制御はモーター動作中のみ
   if (!isRunning_ || !pidEnabled_ || targetRPM_ == 0.0f) {
     return;
   }
-  
-  // RPM計算
-  calculateRPM();
   
   // PID制御でPWM出力を計算
   float pidOutput = calculatePID();
