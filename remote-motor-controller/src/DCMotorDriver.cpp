@@ -221,7 +221,7 @@ void DCMotorDriver::setPWM(float speed) {
     ledcWrite(DC_PWM_CHANNEL_A, 0);
     ledcWrite(DC_PWM_CHANNEL_B, duty);
   } else {
-    // 停止
+    // 停止：両方を0に設定
     Serial.println("[DCMotor] Stop - Duty: 0/255");
     ledcWrite(DC_PWM_CHANNEL_A, 0);
     ledcWrite(DC_PWM_CHANNEL_B, 0);
@@ -230,18 +230,17 @@ void DCMotorDriver::setPWM(float speed) {
 
 uint8_t DCMotorDriver::speedToDuty(float speed) {
   // speed: 0.0 〜 100.0 (%)
-  // duty: 0 〜 255
+  // duty: 0 〜 DC_PWM_MAX_DUTY
   
   // リニアマッピング
   uint8_t duty = (uint8_t)((speed / 100.0f) * 255.0f);
   
   // 最小デューティ比の設定（モーターが動き始めるための最低値）
-  // 必要に応じて調整
-  if (duty > 0 && duty < 30) {
-    duty = 30;  // 最小デューティ比を30/255 (約12%)に設定
+  if (duty > 0 && duty < DC_PWM_MIN_DUTY) {
+    duty = DC_PWM_MIN_DUTY;
   }
   
-  return constrain(duty, 0, 255);
+  return constrain(duty, 0, DC_PWM_MAX_DUTY);
 }
 
 // ============================================================================
