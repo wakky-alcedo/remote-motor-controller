@@ -72,9 +72,10 @@
 // ============================================================================
 // DCモーター - エンコーダー設定
 // ============================================================================
-#define ENCODER_PPR 36          // エンコーダーのパルス/回転数（Pulse Per Revolution）
-#define RPM_UPDATE_INTERVAL 100 // RPM計算更新間隔（ミリ秒）
-#define DC_MOTOR_MAX_RPM 300   // DCモーター最大RPM（Web UI スライダー範囲）
+#define ENCODER_PPR (36*2)        // エンコーダーのパルス/回転数（Pulse Per Revolution）
+#define CONTROL_FREQ 1000       // 制御周波数 (Hz) - タイマー割り込み周期
+#define RPM_CALC_CYCLES 100     // RPM計算周期（制御周期の倍数、100cycles = 100ms）
+#define DC_MOTOR_MAX_RPM 300    // DCモーター最大RPM（Web UI スライダー範囲）
 
 // ============================================================================
 // DCモーター - PWM設定

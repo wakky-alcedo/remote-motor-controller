@@ -65,6 +65,12 @@ public:
    * エンコーダー割り込みハンドラ（静的メソッド）
    */
   static void IRAM_ATTR encoderISR();
+  
+  /**
+   * タイマー割り込みハンドラ（静的メソッド）
+   * 1kHz（1ms）周期でRPM計算とPID制御を実行
+   */
+  static void IRAM_ATTR timerISR();
 
 private:
   float currentSpeed_;         // 現在速度 (-100.0 〜 +100.0 %)
@@ -74,9 +80,12 @@ private:
   
   // エンコーダー関連
   static volatile unsigned long encoderCount_;  // エンコーダーパルスカウント
-  unsigned long lastEncoderCount_;              // 前回のカウント
-  unsigned long lastRPMUpdateTime_;             // 前回のRPM更新時刻
+  volatile unsigned long lastEncoderCount_;     // 前回のカウント
+  volatile unsigned long controlCycleCount_;    // 制御周期カウンタ（1ms毎にインクリメント）
   float currentRPM_;                            // 現在のRPM
+  
+  // タイマー関連
+  static hw_timer_t* timer_;                    // ハードウェアタイマー
   
   // PID制御関連（速度型PID）
   float pidLastError_;         // PID前回誤差 e(k-1)
