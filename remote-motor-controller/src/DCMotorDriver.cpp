@@ -1,6 +1,6 @@
 /**
  * DCMotorDriver.cpp
- * DCモータードライバ実装（PWM制御 + エンコーダーフィードバック + PID制御）
+ * DCモータードライバ実装（PWM制御 + エンコーダーフィードバック + 速度型PID制御）
  * 
  * @author SDDL Project
  * @date 2026/01/19
@@ -27,8 +27,9 @@ DCMotorDriver::DCMotorDriver()
     lastEncoderCount_(0),
     lastRPMUpdateTime_(0),
     currentRPM_(0.0f),
-    pidIntegral_(0.0f),
     pidLastError_(0.0f),
+    pidLastError2_(0.0f),
+    pidLastOutput_(0.0f),
     lastPIDTime_(0),
     pidEnabled_(true) {
   instance_ = this;
@@ -113,7 +114,9 @@ bool DCMotorDriver::setSpeed(float speed, StepMode& currentStepMode) {
       setPWM(0.0f);
       isRunning_ = false;
       currentSpeed_ = 0.0f;
-      pidIntegral_ = 0.0f;  // 積分項リセット
+      pidLastError_ = 0.0f;
+      pidLastError2_ = 0.0f;
+      pidLastOutput_ = 0.0f;
     } else {
       isRunning_ = true;
       // PID制御はupdatePID()で継続的に行う
@@ -157,8 +160,9 @@ void DCMotorDriver::softStop() {
   currentSpeed_ = 0.0f;
   targetSpeed_ = 0.0f;
   targetRPM_ = 0.0f;
-  pidIntegral_ = 0.0f;  // PID積分項リセット
   pidLastError_ = 0.0f;
+  pidLastError2_ = 0.0f;
+  pidLastOutput_ = 0.0f;
 }
 
 void DCMotorDriver::hardStop() {
@@ -176,8 +180,9 @@ void DCMotorDriver::hardStop() {
   currentSpeed_ = 0.0f;
   targetSpeed_ = 0.0f;
   targetRPM_ = 0.0f;
-  pidIntegral_ = 0.0f;
   pidLastError_ = 0.0f;
+  pidLastError2_ = 0.0f;
+  pidLastOutput_ = 0.0f;
 }
 
 bool DCMotorDriver::isBusy() {
@@ -286,15 +291,15 @@ void DCMotorDriver::calculateRPM() {
   
   // デバッグ出力（頻度を抑える）
   static unsigned long lastDebugTime = 0;
-  if (currentTime - lastDebugTime > 1000) {
-    Serial.printf("[DCMotor] RPM: %.2f (Target: %.2f, Pulses: %lu)\n", 
-                  currentRPM_, targetRPM_, deltaPulses);
+  if (currentTime - lastDebugTime > 500) {
+    Serial.printf("[DCMotor] Encoder: Pulses=%lu/%.1fs = %.1fRPM (Target: %.1fRPM)\n", 
+                  deltaPulses, deltaTimeSeconds, absRPM, targetRPM_);
     lastDebugTime = currentTime;
   }
 }
 
 // ============================================================================
-// PID制御
+// PID制御（速度型PID）
 // ============================================================================
 
 float DCMotorDriver::calculatePID() {
@@ -302,35 +307,39 @@ float DCMotorDriver::calculatePID() {
   float deltaTime = (currentTime - lastPIDTime_) / 1000.0f;  // 秒単位
   
   if (deltaTime < 0.001f) {
-    return currentSpeed_;  // 時間差が小さすぎる場合はスキップ
+    return pidLastOutput_;  // 時間差が小さすぎる場合は前回の出力を返す
   }
   
   lastPIDTime_ = currentTime;
   
-  // 誤差計算
+  // 現在の誤差
   float error = targetRPM_ - currentRPM_;
   
-  // 比例項 (P)
-  float pTerm = PID_KP * error;
+  // 速度型PID: Δu(k) = Kp*(e(k)-e(k-1)) + Ki*e(k) + Kd*(e(k)-2*e(k-1)+e(k-2))
+  // 出力の増分を計算
+  float deltaP = PID_KP * (error - pidLastError_);
+  float deltaI = PID_KI * error * deltaTime;
+  float deltaD = PID_KD * (error - 2.0f * pidLastError_ + pidLastError2_) / deltaTime;
   
-  // 積分項 (I)
-  pidIntegral_ += error * deltaTime;
-  pidIntegral_ = constrain(pidIntegral_, -PID_INTEGRAL_LIMIT, PID_INTEGRAL_LIMIT);
-  float iTerm = PID_KI * pidIntegral_;
+  // 出力の増分
+  float deltaOutput = deltaP + deltaI + deltaD;
   
-  // 微分項 (D)
-  float dTerm = PID_KD * (error - pidLastError_) / deltaTime;
-  pidLastError_ = error;
+  // 新しい出力 = 前回の出力 + 増分
+  float output = pidLastOutput_ + deltaOutput;
   
-  // PID出力計算
-  float output = pTerm + iTerm + dTerm;
+  // 出力を制限
   output = constrain(output, -PID_OUTPUT_LIMIT, PID_OUTPUT_LIMIT);
+  
+  // 誤差履歴を更新
+  pidLastError2_ = pidLastError_;
+  pidLastError_ = error;
+  pidLastOutput_ = output;
   
   // デバッグ出力（頻度を抑える）
   static unsigned long lastPIDDebugTime = 0;
-  if (currentTime - lastPIDDebugTime > 500) {
-    Serial.printf("[DCMotor] PID: Error=%.2f P=%.2f I=%.2f D=%.2f Output=%.2f%%\n",
-                  error, pTerm, iTerm, dTerm, output);
+  if (currentTime - lastPIDDebugTime > 200) {  // 200msごとに出力
+    Serial.printf("[DCMotor] PID: T=%.1f C=%.1f E=%.1f ΔP=%.2f ΔI=%.2f ΔD=%.2f Out=%.2f%%\n",
+                  targetRPM_, currentRPM_, error, deltaP, deltaI, deltaD, output);
     lastPIDDebugTime = currentTime;
   }
   

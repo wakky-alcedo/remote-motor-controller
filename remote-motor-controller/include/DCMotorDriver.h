@@ -78,9 +78,10 @@ private:
   unsigned long lastRPMUpdateTime_;             // 前回のRPM更新時刻
   float currentRPM_;                            // 現在のRPM
   
-  // PID制御関連
-  float pidIntegral_;          // PID積分項
-  float pidLastError_;         // PID前回誤差（微分計算用）
+  // PID制御関連（速度型PID）
+  float pidLastError_;         // PID前回誤差 e(k-1)
+  float pidLastError2_;        // PID前々回誤差 e(k-2)（微分計算用）
+  float pidLastOutput_;        // 前回のPID出力値
   unsigned long lastPIDTime_;  // 前回のPID更新時刻
   bool pidEnabled_;            // PID制御有効フラグ
   

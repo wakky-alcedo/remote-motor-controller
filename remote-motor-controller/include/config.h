@@ -83,13 +83,24 @@
 #define DC_PWM_MAX_DUTY 250     // 最大デューティ比 (0-255) - 安全のための上限値
 
 // ============================================================================
-// DCモーター - PID制御パラメータ
+// DCモーター - PID制御パラメータ（速度型PID）
 // ============================================================================
-// PID制御: PWM出力 = Kp*誤差 + Ki*積分 + Kd*微分
-#define PID_KP 1.0f             // 比例ゲイン（Proportional）
-#define PID_KI 0.5f             // 積分ゲイン（Integral）
-#define PID_KD 0.1f             // 微分ゲイン（Derivative）
+// 速度型PID: Δu(k) = Kp*(e(k)-e(k-1)) + Ki*e(k)*Δt + Kd*(e(k)-2*e(k-1)+e(k-2))/Δt
+// 出力 u(k) = u(k-1) + Δu(k)
+//
+// 速度型PIDの利点:
+//   - 積分飽和（ワインドアップ）が起こりにくい
+//   - 出力制限時の挙動が安定
+//   - モーター制御に適している
+//
+// 調整の目安:
+//   Kp: 誤差の変化に対する応答性。大きいほど速く反応するが振動しやすい
+//   Ki: 定常偏差を減らす。大きいほど正確に収束するが、オーバーシュートしやすい
+//   Kd: 振動を抑える。急激な変化にブレーキをかける
+//
+#define PID_KP 0.0f             // 比例ゲイン（Proportional）
+#define PID_KI 0.2f             // 積分ゲイン（Integral）
+#define PID_KD 0.00f            // 微分ゲイン（Derivative）
 #define PID_OUTPUT_LIMIT 100.0f // PID出力上限（PWM %）
-#define PID_INTEGRAL_LIMIT 50.0f // 積分項の上限（ワインドアップ防止）
 
 #endif // CONFIG_H
