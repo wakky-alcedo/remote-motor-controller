@@ -27,13 +27,21 @@ DCMotorDriver::DCMotorDriver()
     isRunning_(false),
     lastEncoderCount_(0),
     controlCycleCount_(0),
+    rpmCalcCycleCount_(0),
     currentRPM_(0.0f),
+    rpmFilterIndex_(0),
+    rpmFilterFilled_(false),
     pidLastError_(0.0f),
     pidLastError2_(0.0f),
     pidLastOutput_(0.0f),
     lastPIDTime_(0),
     pidEnabled_(true) {
   instance_ = this;
+  
+  // 移動平均バッファを初期化
+  for (int i = 0; i < RPM_FILTER_SIZE; i++) {
+    rpmFilterBuffer_[i] = 0.0f;
+  }
 }
 
 DCMotorDriver::~DCMotorDriver() {
@@ -102,7 +110,15 @@ bool DCMotorDriver::init() {
   encoderCount_ = 0;
   lastEncoderCount_ = 0;
   controlCycleCount_ = 0;
+  rpmCalcCycleCount_ = 0;
+  rpmFilterIndex_ = 0;
+  rpmFilterFilled_ = false;
   lastPIDTime_ = millis();
+  
+  // 移動平均バッファをクリア
+  for (int i = 0; i < RPM_FILTER_SIZE; i++) {
+    rpmFilterBuffer_[i] = 0.0f;
+  }
   
   // ハードウェアタイマー設定（タイマー0、プリスケーラ80で1MHz、1000カウントで1kHz）
   timer_ = timerBegin(0, 80, true);  // タイマー0、80分周（1MHz）、カウントアップ
@@ -257,27 +273,45 @@ void IRAM_ATTR DCMotorDriver::timerISR() {
   
   // 制御周期カウンタをインクリメント
   instance_->controlCycleCount_++;
+  instance_->rpmCalcCycleCount_++;
   
-  // RPM計算（RPM_CALC_CYCLES毎、デフォルト100ms）
-  if (instance_->controlCycleCount_ % RPM_CALC_CYCLES == 0) {
+  // RPM計算（RPM_CALC_CYCLES毎に生RPMを計算）
+  if (instance_->rpmCalcCycleCount_ >= RPM_CALC_CYCLES) {
     // パルス数の差分を計算
     unsigned long currentCount = encoderCount_;
     unsigned long deltaPulses = currentCount - instance_->lastEncoderCount_;
     
     // RPM計算: RPM = (パルス数 / PPR) / (時間[秒]) * 60
-    // 時間 = RPM_CALC_CYCLES / 1000 [秒]
-    float deltaTimeSeconds = RPM_CALC_CYCLES / 1000.0f;
-    float absRPM = (deltaPulses / (float)ENCODER_PPR) / deltaTimeSeconds * 60.0f;
+    float deltaTimeSeconds = instance_->rpmCalcCycleCount_ / 1000.0f;
+    float rawRPM = (deltaPulses / (float)ENCODER_PPR) / deltaTimeSeconds * 60.0f;
     
     // 方向を決定：targetRPM_の符号に合わせる
     if (instance_->isRunning_ && instance_->targetRPM_ != 0.0f) {
-      instance_->currentRPM_ = (instance_->targetRPM_ > 0) ? absRPM : -absRPM;
-    } else {
-      instance_->currentRPM_ = absRPM;
+      rawRPM = (instance_->targetRPM_ > 0) ? rawRPM : -rawRPM;
     }
     
-    // 次回計算用に値を保存
+    // 移動平均フィルタに追加
+    instance_->rpmFilterBuffer_[instance_->rpmFilterIndex_] = rawRPM;
+    instance_->rpmFilterIndex_++;
+    
+    if (instance_->rpmFilterIndex_ >= instance_->RPM_FILTER_SIZE) {
+      instance_->rpmFilterIndex_ = 0;
+      instance_->rpmFilterFilled_ = true;
+    }
+    
+    // 移動平均を計算
+    float sum = 0.0f;
+    int count = instance_->rpmFilterFilled_ ? instance_->RPM_FILTER_SIZE : instance_->rpmFilterIndex_;
+    if (count == 0) count = 1;  // ゼロ除算防止
+    
+    for (int i = 0; i < count; i++) {
+      sum += instance_->rpmFilterBuffer_[i];
+    }
+    instance_->currentRPM_ = sum / count;
+    
+    // 次回計算用に値をリセット
     instance_->lastEncoderCount_ = currentCount;
+    instance_->rpmCalcCycleCount_ = 0;
   }
   
   // PID制御（1ms毎に実行）

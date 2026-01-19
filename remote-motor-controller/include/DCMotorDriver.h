@@ -82,7 +82,14 @@ private:
   static volatile unsigned long encoderCount_;  // エンコーダーパルスカウント
   volatile unsigned long lastEncoderCount_;     // 前回のカウント
   volatile unsigned long controlCycleCount_;    // 制御周期カウンタ（1ms毎にインクリメント）
-  float currentRPM_;                            // 現在のRPM
+  volatile unsigned long rpmCalcCycleCount_;    // RPM計算用サイクルカウンタ
+  float currentRPM_;                            // 現在のRPM（移動平均後）
+  
+  // 移動平均フィルタ用
+  static const int RPM_FILTER_SIZE = 20;        // 移動平均のサンプル数
+  float rpmFilterBuffer_[20];                   // RPM移動平均バッファ
+  volatile int rpmFilterIndex_;                 // バッファインデックス
+  volatile bool rpmFilterFilled_;               // バッファが満たされたか
   
   // タイマー関連
   static hw_timer_t* timer_;                    // ハードウェアタイマー
