@@ -75,8 +75,8 @@
 #define ENCODER_PPR (36*2)        // エンコーダーのパルス/回転数（Pulse Per Revolution）
 #define CONTROL_FREQ 1000       // 制御周波数 (Hz) - タイマー割り込み周期
 #define RPM_CALC_CYCLES 5       // RPM生値計算周期（制御周期の倍数、5cycles = 5ms）
-                                // 高頻度でサンプリングし、移動平均フィルタ（20サンプル）で平滑化
-                                // 実質的な応答時間: 5ms × 20 = 100ms
+                                // 高頻度でサンプリングし、移動平均フィルタ（40サンプル）で平滑化
+                                // 実質的な応答時間: 5ms × 40 = 200ms
 #define DC_MOTOR_MAX_RPM 300    // DCモーター最大RPM（Web UI スライダー範囲）
 
 // ============================================================================
@@ -102,7 +102,7 @@
 //   Kd: 振動を抑える。急激な変化にブレーキをかける
 //
 #define PID_KP 0.01f             // 比例ゲイン（Proportional）
-#define PID_KI 0.1f             // 積分ゲイン（Integral）
+#define PID_KI 0.15f             // 積分ゲイン（Integral）
 #define PID_KD 0.00f            // 微分ゲイン（Derivative）
 #define PID_OUTPUT_LIMIT 100.0f // PID出力上限（PWM %）
 
