@@ -76,7 +76,16 @@ bool DCMotorDriver::init() {
   
   // エンコーダーピン設定
   pinMode(ENCODER_PIN, INPUT_PULLUP);
+  
+#if ENCODER_USE_BOTH_EDGES
+  // 両エッジ検出（RISING + FALLING）精度2倍だが割り込み頻度も2倍
+  attachInterrupt(digitalPinToInterrupt(ENCODER_PIN), encoderISR, CHANGE);
+  Serial.println("[DCMotor]   - Encoder: BOTH EDGES mode (RISING + FALLING)");
+#else
+  // 片エッジ検出（RISING のみ）標準設定
   attachInterrupt(digitalPinToInterrupt(ENCODER_PIN), encoderISR, RISING);
+  Serial.println("[DCMotor]   - Encoder: RISING edge only");
+#endif
   
   // PWMチャンネル設定（ESP32のLEDC機能を使用）
   ledcSetup(DC_PWM_CHANNEL_A, DC_PWM_FREQ, DC_PWM_RESOLUTION);
@@ -97,8 +106,12 @@ bool DCMotorDriver::init() {
   Serial.printf("[DCMotor]   - PWM Frequency: %d Hz\n", DC_PWM_FREQ);
   Serial.printf("[DCMotor]   - PWM Resolution: %d bit (0-255)\n", DC_PWM_RESOLUTION);
   Serial.printf("[DCMotor]   - Encoder PPR: %d\n", ENCODER_PPR);
+  Serial.printf("[DCMotor]   - Encoder Debounce: %d us\n", ENCODER_DEBOUNCE_US);
   Serial.printf("[DCMotor]   - Control Frequency: %d Hz (1ms cycle)\n", CONTROL_FREQ);
   Serial.printf("[DCMotor]   - RPM Calc Interval: %d ms\n", RPM_CALC_CYCLES);
+  Serial.printf("[DCMotor]   - Max Pulse Freq @%dRPM: %.1f Hz (Period: %.2f ms)\n",
+                DC_MOTOR_MAX_RPM, (DC_MOTOR_MAX_RPM * ENCODER_PPR / 60.0f),
+                1000.0f / (DC_MOTOR_MAX_RPM * ENCODER_PPR / 60.0f));
   Serial.printf("[DCMotor]   - PID Enabled: %s\n", pidEnabled_ ? "Yes" : "No");
   Serial.printf("[DCMotor]   - PID Gains - Kp:%.2f Ki:%.2f Kd:%.2f\n", 
                 PID_KP, PID_KI, PID_KD);
@@ -263,7 +276,29 @@ uint8_t DCMotorDriver::speedToDuty(float speed) {
 // ============================================================================
 
 void IRAM_ATTR DCMotorDriver::encoderISR() {
-  encoderCount_++;
+  // ソフトウェアデバウンス（チャタリング対策）
+  static unsigned long lastInterruptTime = 0;
+  static unsigned long rejectedCount = 0;  // デバウンスで無視したパルス数
+  unsigned long interruptTime = micros();
+  unsigned long interval = interruptTime - lastInterruptTime;
+  
+  // 前回の割り込みから ENCODER_DEBOUNCE_US 以上経過していることを確認
+  if (interval > ENCODER_DEBOUNCE_US) {
+    encoderCount_++;
+    lastInterruptTime = interruptTime;
+    
+    // 診断: 異常に短い間隔を検出（デバウンス直後の最初のパルス）
+    // 期待値の半分以下の間隔 → チャタリングの可能性
+    // 300RPM時の期待周期: 2.78ms, 半分=1.39ms=1390μs
+    if (interval < 1000 && rejectedCount > 0) {
+      // 直前にチャタリングを検出していた場合、警告
+      // ※この出力は割り込み内なので頻繁には出さない
+    }
+    rejectedCount = 0;
+  } else {
+    // デバウンス期間内の割り込みは無視（チャタリングとみなす）
+    rejectedCount++;
+  }
 }
 
 void IRAM_ATTR DCMotorDriver::timerISR() {
@@ -277,13 +312,22 @@ void IRAM_ATTR DCMotorDriver::timerISR() {
   
   // RPM計算（RPM_CALC_CYCLES毎に生RPMを計算）
   if (instance_->rpmCalcCycleCount_ >= RPM_CALC_CYCLES) {
-    // パルス数の差分を計算
+    // パルス数の差分を計算（オーバーフロー対策：差分は必ず正になる）
     unsigned long currentCount = encoderCount_;
-    unsigned long deltaPulses = currentCount - instance_->lastEncoderCount_;
+    unsigned long lastCount = instance_->lastEncoderCount_;
+    unsigned long deltaPulses;
+    
+    if (currentCount >= lastCount) {
+      deltaPulses = currentCount - lastCount;
+    } else {
+      // オーバーフロー発生時の処理
+      deltaPulses = (ULONG_MAX - lastCount) + currentCount + 1;
+    }
     
     // RPM計算: RPM = (パルス数 / PPR) / (時間[秒]) * 60
-    float deltaTimeSeconds = instance_->rpmCalcCycleCount_ / 1000.0f;
-    float rawRPM = (deltaPulses / (float)ENCODER_PPR) / deltaTimeSeconds * 60.0f;
+    // 高精度化: 整数演算で先に計算してから浮動小数点に変換
+    float deltaTimeMs = (float)instance_->rpmCalcCycleCount_;
+    float rawRPM = (deltaPulses * 60000.0f) / (ENCODER_PPR * deltaTimeMs);
     
     // 方向を決定：targetRPM_の符号に合わせる
     if (instance_->isRunning_ && instance_->targetRPM_ != 0.0f) {
@@ -291,10 +335,10 @@ void IRAM_ATTR DCMotorDriver::timerISR() {
     }
     
     // 移動平均フィルタに追加
-    instance_->rpmFilterBuffer_[instance_->rpmFilterIndex_] = rawRPM;
-    instance_->rpmFilterIndex_++;
+    instance_->rpmFilterBuffer_[instance_->rpmFilterIndex_] = rawRPM; // 生RPMを格納
+    instance_->rpmFilterIndex_++; // インデックスを進める
     
-    if (instance_->rpmFilterIndex_ >= instance_->RPM_FILTER_SIZE) {
+    if (instance_->rpmFilterIndex_ >= instance_->RPM_FILTER_SIZE) { // バッファが満たされた
       instance_->rpmFilterIndex_ = 0;
       instance_->rpmFilterFilled_ = true;
     }
@@ -366,12 +410,25 @@ void DCMotorDriver::calculateRPM() {
   // タイマー割り込みで処理されるため、この関数は空実装
   // デバッグ出力のみ実行
   static unsigned long lastDebugTime = 0;
+  static unsigned long lastPulseCount = 0;
   unsigned long currentTime = millis();
   
   if (currentTime - lastDebugTime > 500) {
-    Serial.printf("[DCMotor] RPM: Current=%.1f Target=%.1f (Pulses: %lu)\n", 
-                  currentRPM_, targetRPM_, encoderCount_);
+    unsigned long deltaPulses = encoderCount_ - lastPulseCount;
+    float pulsesPerSecond = deltaPulses * 2.0f;  // 500ms間隔なので2倍
+    float expectedPulses = abs(currentRPM_) * ENCODER_PPR / 60.0f;
+    float ratio = (expectedPulses > 0) ? (pulsesPerSecond / expectedPulses) : 0;
+    
+    Serial.printf("[DCMotor] RPM: C=%.1f T=%.1f | Pulses=%lu PPS=%.1f Expect=%.1f Ratio=%.2fx\n", 
+                  currentRPM_, targetRPM_, encoderCount_, pulsesPerSecond, expectedPulses, ratio);
+    
+    if (ratio > 1.5f && currentRPM_ > 10) {
+      Serial.println("[DCMotor] WARNING: Pulse count is too high! Possible chattering.");
+      Serial.printf("[DCMotor]   -> Increase ENCODER_DEBOUNCE_US (current: %d us)\n", ENCODER_DEBOUNCE_US);
+    }
+    
     lastDebugTime = currentTime;
+    lastPulseCount = encoderCount_;
   }
 }
 

@@ -425,6 +425,35 @@ const char* WebInterface::getIndexHTML() {
                 </div>
             </div>
 
+            <div style="margin-top: 20px; padding: 20px; background: #f0f4ff; border-radius: 8px;">
+                <label style="display: block; margin-bottom: 10px; font-weight: 600; color: #333;">
+                    ⌨️ 数値入力
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" id="speedInput" 
+                           placeholder="速度を入力)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral((RPM))rawliteral";
+  #else
+  html += R"rawliteral((step/s))rawliteral";
+  #endif
+  html += R"rawliteral(" 
+                           style="flex: 1; padding: 12px; border: 2px solid #667eea; border-radius: 6px; font-size: 1em;"
+                           onkeypress="handleSpeedInputKeyPress(event)"
+                           onchange="syncSliderToInput()">
+                    <span id="inputUnit" style="font-weight: 600; color: #667eea; min-width: 60px;">)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(RPM)rawliteral";
+  #else
+  html += R"rawliteral(step/s)rawliteral";
+  #endif
+  html += R"rawliteral(</span>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.85em; color: #666;">
+                    💡 <strong>Enter</strong>キーで速度を適用 | <strong>Space</strong>キーで停止
+                </div>
+            </div>
+
             <div style="text-align: center; margin-top: 20px;">
                 <button class="btn btn-primary" onclick="applySpeed()">速度を適用</button>
                 <button class="btn btn-success" onclick="stopMotor()">停止</button>
@@ -499,17 +528,60 @@ const char* WebInterface::getIndexHTML() {
 
         function updateSpeedDisplay(value) {
             document.getElementById('speedValue').textContent = value;
+            document.getElementById('speedInput').value = value;
+        }
+
+        function syncSliderToInput() {
+            const input = document.getElementById('speedInput').value;
+            const slider = document.getElementById('speedSlider');
+            if (input !== '') {
+                slider.value = input;
+                document.getElementById('speedValue').textContent = input;
+            }
+        }
+
+        function handleSpeedInputKeyPress(event) {
+            if (event.key === 'Enter') {
+                // Enterキー: 速度を適用
+                event.preventDefault();
+                syncSliderToInput();
+                applySpeed();
+            } else if (event.code === 'Space') {
+                // スペースキー: 停止
+                event.preventDefault();
+                stopMotor();
+            }
         }
 
         function applySpeed() {
-            const speed = parseFloat(document.getElementById('speedSlider').value);
-            sendCommand('setSpeed', speed);
+            const input = document.getElementById('speedInput').value;
+            const sliderValue = parseFloat(document.getElementById('speedSlider').value);
+            const speed = input !== '' ? parseFloat(input) : sliderValue;
+            
+            // 最大値・最小値でクランプ
+            )rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += String("const maxSpeed = " + String(-DC_MOTOR_MAX_RPM) + ";");
+  html += String("const minSpeed = " + String(DC_MOTOR_MAX_RPM) + ";");
+  #else
+  html += String("const maxSpeed = " + String(-MOTOR_MAX_SPEED) + ";");
+  html += String("const minSpeed = " + String(MOTOR_MAX_SPEED) + ";");
+  #endif
+  html += R"rawliteral(
+            
+            const clampedSpeed = Math.max(Math.min(speed, minSpeed), maxSpeed);
+            document.getElementById('speedSlider').value = clampedSpeed;
+            document.getElementById('speedValue').textContent = clampedSpeed;
+            document.getElementById('speedInput').value = clampedSpeed;
+            
+            sendCommand('setSpeed', clampedSpeed);
         }
 
         function stopMotor() {
             sendCommand('stop');
             document.getElementById('speedSlider').value = 0;
             document.getElementById('speedValue').textContent = '0';
+            document.getElementById('speedInput').value = '0';
         }
 
         function emergencyStop() {

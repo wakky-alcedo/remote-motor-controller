@@ -17,10 +17,10 @@
 // #define MOTOR_TYPE_STEPPER  // ステッピングモーターを使用（コメントアウトを切り替え）
 
 // Wi-Fi設定（ここを環境に合わせて変更してください）
-#define WIFI_SSID     "Kawasemi-G"      // 例: "your_wifi_ssid"
-#define WIFI_PASSWORD "most9849"        // 例: "your_wifi_password"
-// #define WIFI_SSID     "SDDLnet"
-// #define WIFI_PASSWORD "smallbear"
+// #define WIFI_SSID     "Kawasemi-G"      // 例: "your_wifi_ssid"
+// #define WIFI_PASSWORD "most9849"        // 例: "your_wifi_password"
+#define WIFI_SSID     "SDDLnet"
+#define WIFI_PASSWORD "smallbear"
 
 // mDNS設定
 #define MDNS_HOSTNAME "motor"  // motor.local でアクセス可能
@@ -73,10 +73,16 @@
 // DCモーター - エンコーダー設定
 // ============================================================================
 #define ENCODER_PPR (36*2)        // エンコーダーのパルス/回転数（Pulse Per Revolution）
+                                  // ※両エッジ検出を有効にする場合は (36*2) = 72 に設定
+#define ENCODER_USE_BOTH_EDGES 1  // 0: RISING のみ, 1: RISING + FALLING（精度2倍、高負荷）
+#define ENCODER_DEBOUNCE_US 500   // デバウンス時間（マイクロ秒）チャタリング対策
+                                  // フォトインタラプタの場合: 100〜500μs 推奨
+                                  // スロット数の倍が取れる場合は値を増やす
 #define CONTROL_FREQ 1000       // 制御周波数 (Hz) - タイマー割り込み周期
-#define RPM_CALC_CYCLES 5       // RPM生値計算周期（制御周期の倍数、5cycles = 5ms）
-                                // 高頻度でサンプリングし、移動平均フィルタ（40サンプル）で平滑化
-                                // 実質的な応答時間: 5ms × 40 = 200ms
+#define RPM_CALC_CYCLES 10      // RPM生値計算周期（制御周期の倍数、10cycles = 10ms）
+                                // 110RPM時: 10msで約1.3パルス（測定精度向上）
+                                // 移動平均フィルタ（20サンプル）で平滑化
+                                // 実質的な応答時間: 10ms × 20 = 200ms
 #define DC_MOTOR_MAX_RPM 300    // DCモーター最大RPM（Web UI スライダー範囲）
 
 // ============================================================================

@@ -86,8 +86,8 @@ private:
   float currentRPM_;                            // 現在のRPM（移動平均後）
   
   // 移動平均フィルタ用
-  static const int RPM_FILTER_SIZE = 40;        // 移動平均のサンプル数
-  float rpmFilterBuffer_[40];                   // RPM移動平均バッファ
+  static const int RPM_FILTER_SIZE = 20;        // 移動平均のサンプル数（10ms×20=200ms）
+  float rpmFilterBuffer_[20];                   // RPM移動平均バッファ
   volatile int rpmFilterIndex_;                 // バッファインデックス
   volatile bool rpmFilterFilled_;               // バッファが満たされたか
   
