@@ -71,6 +71,12 @@ public:
    * @return 現在のステップモード
    */
   virtual StepMode getStepMode() const = 0;
+  
+  /**
+   * 現在のPWMデューティ比を取得（DCモーターのみ有効）
+   * @return デューティ比 (0-100%)
+   */
+  virtual float getCurrentDuty() const = 0;
 };
 
 #endif // I_MOTOR_DRIVER_H

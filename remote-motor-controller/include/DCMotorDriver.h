@@ -62,6 +62,12 @@ public:
   float getCurrentRPM() const;
   
   /**
+   * 現在のPWMデューティ比を取得
+   * @return デューティ比 (0-100%)
+   */
+  float getCurrentDuty() const;
+  
+  /**
    * エンコーダー割り込みハンドラ（静的メソッド）
    */
   static void IRAM_ATTR encoderISR();
@@ -77,6 +83,7 @@ private:
   float targetSpeed_;          // 目標速度
   float targetRPM_;            // 目標RPM
   bool isRunning_;             // モータ動作中フラグ
+  volatile float currentDuty_; // 現在のPWMデューティ比 (0-100%)
   
   // エンコーダー関連
   static volatile unsigned long encoderCount_;  // エンコーダーパルスカウント

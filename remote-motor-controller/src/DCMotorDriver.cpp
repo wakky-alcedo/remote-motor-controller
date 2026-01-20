@@ -25,6 +25,7 @@ DCMotorDriver::DCMotorDriver()
     targetSpeed_(0.0f),
     targetRPM_(0.0f),
     isRunning_(false),
+    currentDuty_(0.0f),
     lastEncoderCount_(0),
     controlCycleCount_(0),
     rpmCalcCycleCount_(0),
@@ -228,6 +229,10 @@ float DCMotorDriver::getCurrentRPM() const {
   return currentRPM_;
 }
 
+float DCMotorDriver::getCurrentDuty() const {
+  return currentDuty_;
+}
+
 // ============================================================================
 // プライベートメソッド
 // ============================================================================
@@ -236,6 +241,9 @@ void DCMotorDriver::setPWM(float speed) {
   // speed: -100.0 〜 +100.0 (%)
   
   uint8_t duty = speedToDuty(abs(speed));
+  
+  // 現在のduty比を記録 (0-100%)
+  currentDuty_ = (duty / 255.0f) * 100.0f;
   
   // 0ではなく0に近い値の場合は停止とみなす→DBL_EPSILONを使用
   if (speed > DBL_EPSILON) {
@@ -387,6 +395,9 @@ void IRAM_ATTR DCMotorDriver::timerISR() {
     
     // PWM設定（割り込み内で直接実行）
     uint8_t duty = instance_->speedToDuty(abs(output));
+    
+    // 現在のduty比を記録
+    instance_->currentDuty_ = (duty / 255.0f) * 100.0f;
     
     if (output > 1e-6) {
       // 正転

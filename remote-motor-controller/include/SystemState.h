@@ -45,6 +45,9 @@ struct SystemState {
   bool motorRunning;      // モータ動作中フラグ
   bool emergencyStop;     // 緊急停止フラグ
   
+  // PWM情報（DCモーターのみ）
+  float pwmDuty;          // 現在のPWMデューティ比 (0-100%)
+  
   // タイムスタンプ
   unsigned long lastUdpTime;  // 最後のUDP受信時刻
   
@@ -56,6 +59,7 @@ struct SystemState {
     stepMode(STEP_128),
     motorRunning(false),
     emergencyStop(false),
+    pwmDuty(0.0f),
     lastUdpTime(0) {}
   
   // 状態リセット

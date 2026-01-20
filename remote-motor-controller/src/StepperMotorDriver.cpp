@@ -164,6 +164,10 @@ StepMode StepperMotorDriver::getStepMode() const {
   return currentStepMode_;
 }
 
+float StepperMotorDriver::getCurrentDuty() const {
+  return 0.0f;  // ステッピングモーターはダミー値
+}
+
 // ============================================================================
 // プライベートメソッド
 // ============================================================================

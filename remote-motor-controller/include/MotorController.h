@@ -98,6 +98,12 @@ public:
   StepMode getStepMode() const;
   
   /**
+   * 現在のPWMデューティ比を取得
+   * @return デューティ比 (0-100%)
+   */
+  float getCurrentDuty() const;
+  
+  /**
    * PID制御更新（DCモーター専用、定期的に呼び出す）
    */
   void updatePID();

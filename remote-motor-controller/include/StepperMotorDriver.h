@@ -48,6 +48,7 @@ public:
   virtual float getCurrentSpeed() override;
   virtual bool isRunning() const override;
   virtual StepMode getStepMode() const override;
+  virtual float getCurrentDuty() const override;  // ダミー（常に0を返す）
 
 private:
   L6470 motor_;                // L6470ドライバインスタンス

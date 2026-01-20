@@ -61,6 +61,7 @@ void WebInterface::broadcastState(const SystemState& state) {
   doc["running"] = state.motorRunning;
   doc["emergency"] = state.emergencyStop;
   doc["stepMode"] = state.stepMode;
+  doc["duty"] = state.pwmDuty;  // PWMデューティ比を追加
   
   String output;
   serializeJson(doc, output);
@@ -366,7 +367,16 @@ const char* WebInterface::getIndexHTML() {
                 <div class="status-item">
                     <div class="status-label">モータ状態</div>
                     <div class="status-value" id="motorStatus">停止</div>
-                </div>
+                </div>)rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(
+                <div class="status-item">
+                    <div class="status-label">PWM Duty</div>
+                    <div class="status-value" id="pwmDuty">0</div>
+                    <div style="font-size: 0.8em; color: #999;">%</div>
+                </div>)rawliteral";
+  #endif
+  html += R"rawliteral(
             </div>
         </div>
 
@@ -512,6 +522,17 @@ const char* WebInterface::getIndexHTML() {
                 data.mode === 'internal' ? 'Internal' : 'External';
             document.getElementById('motorStatus').textContent = 
                 data.running ? '動作中' : '停止';
+            
+            // PWM Duty比を更新（DCモーターの場合のみ）
+            )rawliteral";
+  #ifdef MOTOR_TYPE_DC
+  html += R"rawliteral(
+            if (data.duty !== undefined) {
+                document.getElementById('pwmDuty').textContent = data.duty.toFixed(1);
+            }
+            )rawliteral";
+  #endif
+  html += R"rawliteral(
             
             // Update mode buttons
             document.getElementById('btnInternal').classList.toggle('active', data.mode === 'internal');

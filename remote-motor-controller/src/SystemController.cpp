@@ -237,6 +237,7 @@ void SystemController::broadcastState() {
     state_.currentSpeed = motor_.getCurrentSpeed();
     state_.motorRunning = motor_.isRunning();
     state_.stepMode = motor_.getStepMode();
+    state_.pwmDuty = motor_.getCurrentDuty();  // DCモーターの場合はduty比、ステッピングは0
     
     // デバッグ: 取得した速度を表示
     Serial.printf("[SystemController] Broadcasting - Current: %.2f, Target: %.2f, Running: %d\n",
