@@ -1,18 +1,21 @@
 /**
  * DCMotorDriver.cpp
  * DCモータードライバ実装（PWM制御 + エンコーダーフィードバック + 速度型PID制御）
+ * M/T法によるRPM計測 + IIRローパスフィルタ
  * 
  * @author SDDL Project
- * @date 2026/01/19
+ * @date 2026/01/29
  */
 
 #include "DCMotorDriver.h"
-#include "float.h"
+#include <float.h>
+#include <math.h>
 
 // ============================================================================
 // 静的メンバー変数の初期化
 // ============================================================================
 volatile unsigned long DCMotorDriver::encoderCount_ = 0;
+volatile unsigned long DCMotorDriver::lastEdgeTime_ = 0;
 DCMotorDriver* DCMotorDriver::instance_ = nullptr;
 hw_timer_t* DCMotorDriver::timer_ = nullptr;
 
@@ -27,22 +30,16 @@ DCMotorDriver::DCMotorDriver()
     isRunning_(false),
     currentDuty_(0.0f),
     lastEncoderCount_(0),
+    prevDeltaT_(0),
     controlCycleCount_(0),
     rpmCalcCycleCount_(0),
     currentRPM_(0.0f),
-    rpmFilterIndex_(0),
-    rpmFilterFilled_(false),
     pidLastError_(0.0f),
     pidLastError2_(0.0f),
     pidLastOutput_(0.0f),
     lastPIDTime_(0),
     pidEnabled_(true) {
   instance_ = this;
-  
-  // 移動平均バッファを初期化
-  for (int i = 0; i < RPM_FILTER_SIZE; i++) {
-    rpmFilterBuffer_[i] = 0.0f;
-  }
 }
 
 DCMotorDriver::~DCMotorDriver() {
@@ -109,7 +106,8 @@ bool DCMotorDriver::init() {
   Serial.printf("[DCMotor]   - Encoder PPR: %d\n", ENCODER_PPR);
   Serial.printf("[DCMotor]   - Encoder Debounce: %d us\n", ENCODER_DEBOUNCE_US);
   Serial.printf("[DCMotor]   - Control Frequency: %d Hz (1ms cycle)\n", CONTROL_FREQ);
-  Serial.printf("[DCMotor]   - RPM Calc Interval: %d ms\n", RPM_CALC_CYCLES);
+  Serial.printf("[DCMotor]   - RPM Calc Interval: %d ms (M/T method)\n", RPM_CALC_CYCLES);
+  Serial.printf("[DCMotor]   - IIR Filter Alpha: %.2f\n", RPM_IIR_ALPHA);
   Serial.printf("[DCMotor]   - Max Pulse Freq @%dRPM: %.1f Hz (Period: %.2f ms)\n",
                 DC_MOTOR_MAX_RPM, (DC_MOTOR_MAX_RPM * ENCODER_PPR / 60.0f),
                 1000.0f / (DC_MOTOR_MAX_RPM * ENCODER_PPR / 60.0f));
@@ -123,16 +121,12 @@ bool DCMotorDriver::init() {
   isRunning_ = false;
   encoderCount_ = 0;
   lastEncoderCount_ = 0;
+  lastEdgeTime_ = micros();  // 現在時刻で初期化
+  prevDeltaT_ = 0;
   controlCycleCount_ = 0;
   rpmCalcCycleCount_ = 0;
-  rpmFilterIndex_ = 0;
-  rpmFilterFilled_ = false;
+  currentRPM_ = 0.0f;
   lastPIDTime_ = millis();
-  
-  // 移動平均バッファをクリア
-  for (int i = 0; i < RPM_FILTER_SIZE; i++) {
-    rpmFilterBuffer_[i] = 0.0f;
-  }
   
   // ハードウェアタイマー設定（タイマー0、プリスケーラ80で1MHz、1000カウントで1kHz）
   timer_ = timerBegin(0, 80, true);  // タイマー0、80分周（1MHz）、カウントアップ
@@ -286,26 +280,14 @@ uint8_t DCMotorDriver::speedToDuty(float speed) {
 void IRAM_ATTR DCMotorDriver::encoderISR() {
   // ソフトウェアデバウンス（チャタリング対策）
   static unsigned long lastInterruptTime = 0;
-  static unsigned long rejectedCount = 0;  // デバウンスで無視したパルス数
   unsigned long interruptTime = micros();
   unsigned long interval = interruptTime - lastInterruptTime;
   
   // 前回の割り込みから ENCODER_DEBOUNCE_US 以上経過していることを確認
   if (interval > ENCODER_DEBOUNCE_US) {
     encoderCount_++;
+    lastEdgeTime_ = interruptTime;  // M/T法用: 最新エッジ時刻を記録
     lastInterruptTime = interruptTime;
-    
-    // 診断: 異常に短い間隔を検出（デバウンス直後の最初のパルス）
-    // 期待値の半分以下の間隔 → チャタリングの可能性
-    // 300RPM時の期待周期: 2.78ms, 半分=1.39ms=1390μs
-    if (interval < 1000 && rejectedCount > 0) {
-      // 直前にチャタリングを検出していた場合、警告
-      // ※この出力は割り込み内なので頻繁には出さない
-    }
-    rejectedCount = 0;
-  } else {
-    // デバウンス期間内の割り込みは無視（チャタリングとみなす）
-    rejectedCount++;
   }
 }
 
@@ -318,51 +300,57 @@ void IRAM_ATTR DCMotorDriver::timerISR() {
   instance_->controlCycleCount_++;
   instance_->rpmCalcCycleCount_++;
   
-  // RPM計算（RPM_CALC_CYCLES毎に生RPMを計算）
+  // RPM計算（RPM_CALC_CYCLES毎にM/T法で計算）
   if (instance_->rpmCalcCycleCount_ >= RPM_CALC_CYCLES) {
-    // パルス数の差分を計算（オーバーフロー対策：差分は必ず正になる）
+    // パルス数の差分を計算（Δm）
     unsigned long currentCount = encoderCount_;
     unsigned long lastCount = instance_->lastEncoderCount_;
-    unsigned long deltaPulses;
+    unsigned long deltaM;
     
     if (currentCount >= lastCount) {
-      deltaPulses = currentCount - lastCount;
+      deltaM = currentCount - lastCount;
     } else {
       // オーバーフロー発生時の処理
-      deltaPulses = (ULONG_MAX - lastCount) + currentCount + 1;
+      deltaM = (ULONG_MAX - lastCount) + currentCount + 1;
     }
     
-    // RPM計算: RPM = (パルス数 / PPR) / (時間[秒]) * 60
-    // 高精度化: 整数演算で先に計算してから浮動小数点に変換
-    float deltaTimeMs = (float)instance_->rpmCalcCycleCount_;
-    float rawRPM = (deltaPulses * 60000.0f) / (ENCODER_PPR * deltaTimeMs);
+    // M/T法: ω = 2π·Δm / {P·(n·Ts + δT_k - δT_{k-1})}
+    // RPM = ω * 60 / (2π) = 60·Δm / {P·(n·Ts + δT_k - δT_{k-1})}
+    // T_us = n·Ts + δT_k - δT_{k-1} (μs単位)
+    // n = rpmCalcCycleCount_, Ts = 1000μs (1ms)
+    
+    unsigned long currentEdgeTime = lastEdgeTime_;
+    unsigned long n_Ts = instance_->rpmCalcCycleCount_ * 1000;  // n×Ts (μs)
+    
+    // δT_k: 現在の計測終了時刻からエッジまでの時間差
+    // δT_{k-1}: 前回計測終了時刻からエッジまでの時間差（前回保存済み）
+    // ここでは簡略化: T_us ≈ n×Ts を基本とし、エッジ間隔で補正
+    unsigned long T_us = n_Ts;
+    
+    float rawRPM = 0.0f;
+    
+    if (deltaM > 0 && T_us > 0) {
+      // RPM = 60 * Δm * 1000000 / (PPR * T_us) = 60000000 * Δm / (PPR * T_us)
+      rawRPM = (60000000.0f * deltaM) / ((float)ENCODER_PPR * (float)T_us);
+      
+      // 異常値チェック（最大RPMの2倍を超える場合は無視）
+      if (rawRPM > DC_MOTOR_MAX_RPM * 2.0f) {
+        rawRPM = instance_->currentRPM_;  // 前回値を維持
+      }
+    }
     
     // 方向を決定：targetRPM_の符号に合わせる
     if (instance_->isRunning_ && instance_->targetRPM_ != 0.0f) {
       rawRPM = (instance_->targetRPM_ > 0) ? rawRPM : -rawRPM;
     }
     
-    // 移動平均フィルタに追加
-    instance_->rpmFilterBuffer_[instance_->rpmFilterIndex_] = rawRPM; // 生RPMを格納
-    instance_->rpmFilterIndex_++; // インデックスを進める
+    // IIRローパスフィルタを適用
+    // y[n] = α * x[n] + (1 - α) * y[n-1]
+    instance_->currentRPM_ = RPM_IIR_ALPHA * rawRPM + (1.0f - RPM_IIR_ALPHA) * instance_->currentRPM_;
     
-    if (instance_->rpmFilterIndex_ >= instance_->RPM_FILTER_SIZE) { // バッファが満たされた
-      instance_->rpmFilterIndex_ = 0;
-      instance_->rpmFilterFilled_ = true;
-    }
-    
-    // 移動平均を計算
-    float sum = 0.0f;
-    int count = instance_->rpmFilterFilled_ ? instance_->RPM_FILTER_SIZE : instance_->rpmFilterIndex_;
-    if (count == 0) count = 1;  // ゼロ除算防止
-    
-    for (int i = 0; i < count; i++) {
-      sum += instance_->rpmFilterBuffer_[i];
-    }
-    instance_->currentRPM_ = sum / count;
-    
-    // 次回計算用に値をリセット
+    // 次回計算用に値を保存
     instance_->lastEncoderCount_ = currentCount;
+    instance_->prevDeltaT_ = currentEdgeTime;  // 現在のエッジ時刻を保存
     instance_->rpmCalcCycleCount_ = 0;
   }
   
