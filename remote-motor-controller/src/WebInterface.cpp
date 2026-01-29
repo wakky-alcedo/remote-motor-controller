@@ -259,7 +259,15 @@ void WebInterface::broadcastRecordingState(bool isRecording, size_t recordCount,
 
 const char* WebInterface::getIndexHTML() {
   // MOTOR_MAX_SPEEDに基づいて動的にHTMLを生成
+  // 一度だけ構築してキャッシュする
   static String html;
+  static bool initialized = false;
+  
+  if (initialized) {
+    return html.c_str();
+  }
+  
+  html.reserve(16000);  // メモリを事前確保
   html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="ja">
@@ -595,7 +603,7 @@ const char* WebInterface::getIndexHTML() {
                 </button>
             </div>
             <p style="margin-top: 10px; color: #666; font-size: 0.85em; text-align: center;">
-                💡 10msごとに記録 | 最大約100秒（10000レコード）
+                💡 10msごとに記録 | 最大約30秒（3000レコード）
             </p>
         </div>
 
@@ -803,5 +811,7 @@ const char* WebInterface::getIndexHTML() {
 </html>
 )rawliteral";
   
+  initialized = true;
+  Serial.printf("[WebInterface] HTML generated, size: %d bytes\n", html.length());
   return html.c_str();
 }

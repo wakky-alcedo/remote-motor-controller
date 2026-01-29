@@ -18,14 +18,8 @@ DataLogger::DataLogger()
     recording_(false),
     startTime_(0),
     lastRecordTime_(0) {
-  // バッファを動的確保
-  buffer_ = new LogRecord[LOG_MAX_RECORDS];
-  if (buffer_ == nullptr) {
-    Serial.println("[DataLogger] ERROR: Failed to allocate buffer!");
-  } else {
-    Serial.printf("[DataLogger] Buffer allocated: %d records (%d bytes)\n", 
-                  LOG_MAX_RECORDS, LOG_MAX_RECORDS * sizeof(LogRecord));
-  }
+  // バッファは収録開始時に遅延確保（メモリ節約）
+  Serial.println("[DataLogger] Initialized (buffer will be allocated on recording start)");
 }
 
 DataLogger::~DataLogger() {
@@ -40,9 +34,15 @@ DataLogger::~DataLogger() {
 // ============================================================================
 
 void DataLogger::startRecording() {
+  // バッファが未確保なら確保する（遅延初期化）
   if (buffer_ == nullptr) {
-    Serial.println("[DataLogger] ERROR: Buffer not allocated!");
-    return;
+    Serial.printf("[DataLogger] Allocating buffer: %d records (%d bytes)\n", 
+                  LOG_MAX_RECORDS, LOG_MAX_RECORDS * sizeof(LogRecord));
+    buffer_ = new LogRecord[LOG_MAX_RECORDS];
+    if (buffer_ == nullptr) {
+      Serial.println("[DataLogger] ERROR: Failed to allocate buffer!");
+      return;
+    }
   }
   
   // バッファをクリア
