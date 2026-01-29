@@ -85,18 +85,23 @@ private:
   bool isRunning_;             // モータ動作中フラグ
   volatile float currentDuty_; // 現在のPWMデューティ比 (0-100%)
   
-  // エンコーダー関連
-  static volatile unsigned long encoderCount_;  // エンコーダーパルスカウント
-  volatile unsigned long lastEncoderCount_;     // 前回のカウント
+  // ============================================================================
+  // M/T法エンコーダー計測
+  // ============================================================================
+  // M法変数（パルスカウント）
+  static volatile unsigned long encoderCount_;  // 累積エンコーダーパルスカウント
+  volatile unsigned long lastEncoderCount_;     // 前回計測時のカウント
+  
+  // T法変数（周期計測）
+  static volatile unsigned long lastEdgeTime_;  // 最新エッジの時刻 (micros)
+  static volatile unsigned long edgeInterval_;  // 最新のエッジ間隔 (μs)
+  static volatile unsigned long firstEdgeTime_; // 計測開始時の最初のエッジ時刻
+  static volatile unsigned long edgeCountInPeriod_; // 計測期間内のエッジ数
+  
+  // RPM計算関連
   volatile unsigned long controlCycleCount_;    // 制御周期カウンタ（1ms毎にインクリメント）
   volatile unsigned long rpmCalcCycleCount_;    // RPM計算用サイクルカウンタ
-  float currentRPM_;                            // 現在のRPM（移動平均後）
-  
-  // 移動平均フィルタ用
-  static const int RPM_FILTER_SIZE = 20;        // 移動平均のサンプル数（10ms×20=200ms）
-  float rpmFilterBuffer_[20];                   // RPM移動平均バッファ
-  volatile int rpmFilterIndex_;                 // バッファインデックス
-  volatile bool rpmFilterFilled_;               // バッファが満たされたか
+  volatile float currentRPM_;                   // 現在のRPM（M/T法計算後）
   
   // タイマー関連
   static hw_timer_t* timer_;                    // ハードウェアタイマー
