@@ -17,9 +17,11 @@ SystemController::SystemController()
     network_(),
     udp_(WATCHDOG_TIMEOUT_MS),
     web_(80),
+    dataLogger_(),
     state_(),
     lastBroadcastTime_(0),
-    lastStatusLogTime_(0) {
+    lastStatusLogTime_(0),
+    lastRecordingBroadcastTime_(0) {
 }
 
 SystemController::~SystemController() {
@@ -85,6 +87,9 @@ bool SystemController::init() {
     Serial.println("[SystemController] ERROR: Web server initialization failed!");
     return false;
   }
+  
+  // DataLoggerをWebInterfaceに設定
+  web_.setDataLogger(&dataLogger_);
   Serial.println("[SystemController] Web server initialization complete\n");
   
   // 初期化完了メッセージ
@@ -122,11 +127,29 @@ void SystemController::update() {
   // PID制御更新（DCモーターの場合のみ）
   motor_.updatePID();
   
+  // データロガー記録（収録中の場合）
+  if (dataLogger_.isRecording()) {
+    state_.currentSpeed = motor_.getCurrentSpeed();
+    dataLogger_.record(state_.currentSpeed, state_.targetSpeed);
+  }
+  
   // 状態ブロードキャスト（500msごと、クライアント接続時のみ）
   unsigned long now = millis();
   if (now - lastBroadcastTime_ > BROADCAST_INTERVAL_MS) {
     broadcastState();
     lastBroadcastTime_ = now;
+  }
+  
+  // 収録状態ブロードキャスト（500msごと）
+  if (now - lastRecordingBroadcastTime_ > 500) {
+    if (web_.getClientCount() > 0) {
+      web_.broadcastRecordingState(
+        dataLogger_.isRecording(),
+        dataLogger_.getRecordCount(),
+        dataLogger_.getRecordDuration()
+      );
+    }
+    lastRecordingBroadcastTime_ = now;
   }
   
   // 定期的な状態ログ出力（10秒ごと）
@@ -203,6 +226,16 @@ void SystemController::handleWebCommand() {
           state_.mode = MODE_INTERNAL;
           Serial.println("[SystemController] Mode set to INTERNAL");
         }
+        break;
+      
+      case CMD_START_RECORDING:
+        Serial.println("[SystemController] Starting data recording...");
+        dataLogger_.startRecording();
+        break;
+      
+      case CMD_STOP_RECORDING:
+        Serial.println("[SystemController] Stopping data recording...");
+        dataLogger_.stopRecording();
         break;
         
       default:

@@ -17,6 +17,7 @@ WebInterface::WebInterface(uint16_t port)
   : server_(port),
     ws_("/ws"),
     port_(port),
+    dataLogger_(nullptr),
     hasNewCommand_(false) {
 }
 
@@ -44,6 +45,76 @@ bool WebInterface::init() {
   server_.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
     // ダミーの状態を返す（実際の状態は別途管理）
     request->send(200, "application/json", "{\"status\":\"ok\"}");
+  });
+  
+  // CSVダウンロードAPI
+  server_.on("/api/download_csv", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (dataLogger_ == nullptr) {
+      request->send(500, "text/plain", "DataLogger not available");
+      return;
+    }
+    
+    if (dataLogger_->getRecordCount() == 0) {
+      request->send(404, "text/plain", "No data recorded");
+      return;
+    }
+    
+    Serial.printf("[WebInterface] CSV download requested. Records: %d\n", dataLogger_->getRecordCount());
+    
+    // チャンク転送でCSVを送信（メモリ節約）
+    AsyncWebServerResponse *response = request->beginChunkedResponse("text/csv",
+      [this](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        static size_t currentRecord = 0;
+        static bool headerSent = false;
+        
+        // 最初の呼び出しでリセット
+        if (index == 0) {
+          currentRecord = 0;
+          headerSent = false;
+        }
+        
+        // 全レコード送信完了
+        if (currentRecord >= dataLogger_->getRecordCount() && headerSent) {
+          return 0;
+        }
+        
+        String chunk;
+        size_t chunkRecords = 100;  // 一度に100レコード
+        
+        size_t sent = dataLogger_->exportCSVChunk(currentRecord, chunkRecords, chunk);
+        if (!headerSent && currentRecord == 0) {
+          headerSent = true;
+        }
+        currentRecord += sent;
+        
+        size_t len = chunk.length();
+        if (len > maxLen) len = maxLen;
+        memcpy(buffer, chunk.c_str(), len);
+        
+        return len;
+      }
+    );
+    
+    response->addHeader("Content-Disposition", "attachment; filename=motor_log.csv");
+    request->send(response);
+  });
+  
+  // ログ情報API
+  server_.on("/api/log_info", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (dataLogger_ == nullptr) {
+      request->send(500, "application/json", "{\"error\":\"DataLogger not available\"}");
+      return;
+    }
+    
+    JsonDocument doc;
+    doc["recording"] = dataLogger_->isRecording();
+    doc["recordCount"] = dataLogger_->getRecordCount();
+    doc["duration"] = dataLogger_->getRecordDuration();
+    doc["maxRecords"] = dataLogger_->getMaxRecords();
+    
+    String output;
+    serializeJson(doc, output);
+    request->send(200, "application/json", output);
   });
   
   // サーバー開始
@@ -149,6 +220,12 @@ void WebInterface::handleWebSocketMessage(uint8_t *data, size_t len) {
     } else if (cmd == "reset") {
       commandData.command = CMD_RESET;
       Serial.println("[WebInterface] Command: reset");
+    } else if (cmd == "startRecording") {
+      commandData.command = CMD_START_RECORDING;
+      Serial.println("[WebInterface] Command: startRecording");
+    } else if (cmd == "stopRecording") {
+      commandData.command = CMD_STOP_RECORDING;
+      Serial.println("[WebInterface] Command: stopRecording");
     } else if (cmd == "setMode" && doc.containsKey("value")) {
       commandData.command = CMD_SET_MODE;
       commandData.stringValue = doc["value"].as<String>();
@@ -161,6 +238,23 @@ void WebInterface::handleWebSocketMessage(uint8_t *data, size_t len) {
       hasNewCommand_ = true;
     }
   }
+}
+
+void WebInterface::setDataLogger(DataLogger* logger) {
+  dataLogger_ = logger;
+  Serial.println("[WebInterface] DataLogger set");
+}
+
+void WebInterface::broadcastRecordingState(bool isRecording, size_t recordCount, float duration) {
+  JsonDocument doc;
+  doc["type"] = "recording";
+  doc["recording"] = isRecording;
+  doc["recordCount"] = recordCount;
+  doc["duration"] = duration;
+  
+  String output;
+  serializeJson(doc, output);
+  ws_.textAll(output);
 }
 
 const char* WebInterface::getIndexHTML() {
@@ -470,6 +564,41 @@ const char* WebInterface::getIndexHTML() {
             </div>
         </div>
 
+        <div class="control-section">
+            <h2>📹 データ収録</h2>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <div class="status-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="status-item">
+                        <div class="status-label">収録状態</div>
+                        <div class="status-value" id="recordingStatus" style="color: #666;">停止</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">レコード数</div>
+                        <div class="status-value" id="recordCount">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">収録時間</div>
+                        <div class="status-value" id="recordDuration">0.0</div>
+                        <div style="font-size: 0.8em; color: #999;">秒</div>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn btn-success" id="btnStartRecording" onclick="startRecording()">
+                    ▶️ 収録開始
+                </button>
+                <button class="btn btn-danger" id="btnStopRecording" onclick="stopRecording()" style="display: none;">
+                    ⏹️ 収録停止
+                </button>
+                <button class="btn btn-primary" id="btnDownloadCSV" onclick="downloadCSV()" disabled>
+                    📥 CSVダウンロード
+                </button>
+            </div>
+            <p style="margin-top: 10px; color: #666; font-size: 0.85em; text-align: center;">
+                💡 10msごとに記録 | 最大約100秒（10000レコード）
+            </p>
+        </div>
+
         <div class="emergency-section">
             <h2 style="color: #e74c3c; margin-bottom: 20px;">🚨 緊急停止</h2>
             <button class="btn btn-danger" onclick="emergencyStop()">緊急停止 (EMG STOP)</button>
@@ -511,8 +640,36 @@ const char* WebInterface::getIndexHTML() {
             
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                updateStatus(data);
+                if (data.type === 'recording') {
+                    updateRecordingStatus(data);
+                } else {
+                    updateStatus(data);
+                }
             };
+        }
+
+        function updateRecordingStatus(data) {
+            const statusEl = document.getElementById('recordingStatus');
+            const startBtn = document.getElementById('btnStartRecording');
+            const stopBtn = document.getElementById('btnStopRecording');
+            const downloadBtn = document.getElementById('btnDownloadCSV');
+            
+            if (data.recording) {
+                statusEl.textContent = '収録中';
+                statusEl.style.color = '#e74c3c';
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                downloadBtn.disabled = true;
+            } else {
+                statusEl.textContent = '停止';
+                statusEl.style.color = '#666';
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                downloadBtn.disabled = (data.recordCount === 0);
+            }
+            
+            document.getElementById('recordCount').textContent = data.recordCount;
+            document.getElementById('recordDuration').textContent = data.duration.toFixed(1);
         }
 
         function updateStatus(data) {
@@ -619,8 +776,28 @@ const char* WebInterface::getIndexHTML() {
             sendCommand('setMode', mode);
         }
 
+        function startRecording() {
+            sendCommand('startRecording');
+        }
+
+        function stopRecording() {
+            sendCommand('stopRecording');
+        }
+
+        function downloadCSV() {
+            window.location.href = '/api/download_csv';
+        }
+
         // Initialize
         connectWebSocket();
+        
+        // 初期収録状態を取得
+        fetch('/api/log_info')
+            .then(response => response.json())
+            .then(data => {
+                updateRecordingStatus(data);
+            })
+            .catch(err => console.log('Failed to fetch log info:', err));
     </script>
 </body>
 </html>

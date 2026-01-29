@@ -13,6 +13,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include "SystemState.h"
+#include "DataLogger.h"
 
 // ============================================================================
 // Webコマンド定義
@@ -23,7 +24,9 @@ enum WebCommand {
   CMD_STOP,
   CMD_EMERGENCY_STOP,
   CMD_RESET,
-  CMD_SET_MODE
+  CMD_SET_MODE,
+  CMD_START_RECORDING,    // 収録開始
+  CMD_STOP_RECORDING      // 収録停止
 };
 
 // ============================================================================
@@ -84,6 +87,20 @@ public:
   bool hasCommand(WebCommandData& commandData);
   
   /**
+   * DataLoggerを設定
+   * @param logger DataLoggerへのポインタ
+   */
+  void setDataLogger(DataLogger* logger);
+  
+  /**
+   * 収録状態をブロードキャスト
+   * @param isRecording 収録中フラグ
+   * @param recordCount 記録済みレコード数
+   * @param duration 記録時間（秒）
+   */
+  void broadcastRecordingState(bool isRecording, size_t recordCount, float duration);
+  
+  /**
    * WebSocketイベントハンドラを設定するための内部関数
    * このメソッドはinitから呼ばれる
    */
@@ -93,6 +110,7 @@ private:
   AsyncWebServer server_;     // Webサーバーインスタンス
   AsyncWebSocket ws_;         // WebSocketインスタンス
   uint16_t port_;             // サーバーポート
+  DataLogger* dataLogger_;    // DataLoggerへのポインタ
   
   WebCommandData pendingCommand_;  // 保留中のコマンド
   bool hasNewCommand_;             // 新しいコマンドがあるか

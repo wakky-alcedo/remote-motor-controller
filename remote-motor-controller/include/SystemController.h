@@ -16,6 +16,7 @@
 #include "NetworkManager.h"
 #include "UDPController.h"
 #include "WebInterface.h"
+#include "DataLogger.h"
 
 // ============================================================================
 // WiFi設定（config.hから読み込み）
@@ -75,6 +76,7 @@ private:
   NetworkManager network_;
   UDPController udp_;
   WebInterface web_;
+  DataLogger dataLogger_;
   
   // システム状態
   SystemState state_;
@@ -82,6 +84,7 @@ private:
   // タイムスタンプ
   unsigned long lastBroadcastTime_;
   unsigned long lastStatusLogTime_;
+  unsigned long lastRecordingBroadcastTime_;
   
   /**
    * UDPコマンドを処理

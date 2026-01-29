@@ -19,8 +19,10 @@
 // Wi-Fi設定（ここを環境に合わせて変更してください）
 // #define WIFI_SSID     "Kawasemi-G"      // 例: "your_wifi_ssid"
 // #define WIFI_PASSWORD "most9849"        // 例: "your_wifi_password"
-#define WIFI_SSID     "SDDLnet"
-#define WIFI_PASSWORD "smallbear"
+// #define WIFI_SSID     "SDDLnet"
+// #define WIFI_PASSWORD "smallbear"
+#define WIFI_SSID     "Hippopotamus"
+#define WIFI_PASSWORD "origami2827"
 
 // mDNS設定
 #define MDNS_HOSTNAME "motor"  // motor.local でアクセス可能
